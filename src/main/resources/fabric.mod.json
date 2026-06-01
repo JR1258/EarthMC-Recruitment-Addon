@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "recruitmentaddon",
+  "version": "${version}",
+  "name": "EarthMC Recruitment Addon",
+  "description": "Finds recruitable players on EarthMC (townless / newly-registered) and helps you reach out.",
+  "authors": ["JR1258"],
+  "contact": {
+    "homepage": "https://github.com/JR1258/EarthMC-Recruitment-Addon",
+    "issues": "https://github.com/JR1258/EarthMC-Recruitment-Addon/issues"
+  },
+  "license": "Apache-2.0",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.recruitmentaddon.RecruitmentAddon"]
+  },
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "fabric-api": "*",
+    "minecraft": "1.21.11"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}

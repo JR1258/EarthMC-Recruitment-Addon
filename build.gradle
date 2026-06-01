@@ -1,0 +1,61 @@
+plugins {
+    id 'fabric-loom' version '1.14-SNAPSHOT'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group   = project.maven_group
+base { archivesName = "${project.archives_base_name}-${project.minecraft_version}" }
+
+repositories {
+    maven { url 'https://maven.fabricmc.net/' }
+    maven { url 'https://maven.terraformersmc.com/releases/' }
+}
+
+dependencies {
+    minecraft         "com.mojang:minecraft:${project.minecraft_version}"
+    mappings          "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    modCompileOnly    "com.terraformersmc:modmenu:${project.modmenu_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    filteringCharset 'UTF-8'
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+    withSourcesJar()
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.archives_base_name}" }
+    }
+}
+
+// Deploy the built jar to the local Modrinth launcher profile for testing.
+def modsDir = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/profiles/1.21.11/mods"))
+def oldModJarPrefixes = ['earthmc-recruitment-addon']
+
+tasks.register('deployToMods', Copy) {
+    dependsOn remapJar
+    from(remapJar.archiveFile)
+    into(modsDir)
+    doFirst {
+        modsDir.listFiles()?.each { f ->
+            if (oldModJarPrefixes.any { prefix -> f.name.startsWith(prefix) }) f.delete()
+        }
+    }
+    doLast {
+        println "Deployed ${remapJar.archiveFileName.get()} → ${modsDir}"
+    }
+}
+
+build.finalizedBy(deployToMods)
