@@ -11,7 +11,9 @@ import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
+import net.recruitmentaddon.api.EarthMcData;
 import net.recruitmentaddon.model.LivePlayer;
+import net.recruitmentaddon.model.PlayerProfile;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,19 +69,48 @@ public final class RecruitCommand {
     }
 
     private static int scan(FabricClientCommandSource source) {
-        List<LivePlayer> nearby = RecruitmentAddon.recruitableNearby();
         MinecraftClient mc = MinecraftClient.getInstance();
         ClientPlayerEntity self = mc.player;
-        if (nearby.isEmpty() || self == null) {
-            feedback(source, "No recruitable players nearby right now.");
-            return 1;
-        }
+        EarthMcData data = RecruitmentAddon.data();
+        RecruitmentConfig c = RecruitmentAddon.config();
+        if (self == null || data == null) { feedback(source, "Not in a world."); return 1; }
+
         int px = (int) Math.round(self.getX());
         int pz = (int) Math.round(self.getZ());
-        List<LivePlayer> sorted = new ArrayList<>(nearby);
-        sorted.sort(Comparator.comparingDouble(p -> RecruitmentAddon.distance(px, pz, p.x(), p.z())));
-        feedback(source, "§eRecruitable nearby (" + sorted.size() + "):");
-        for (LivePlayer p : sorted) {
+        int range = c.hudRange;
+        String selfName = self.getName().getString();
+
+        List<LivePlayer> online = data.onlinePlayers();
+        List<String> inRangeNames = new ArrayList<>();
+        int inRange = 0, profiled = 0;
+        List<LivePlayer> recruitable = new ArrayList<>();
+        for (LivePlayer p : online) {
+            if (p.name().equalsIgnoreCase(selfName)) continue;
+            if (range > 0 && RecruitmentAddon.distance(px, pz, p.x(), p.z()) > range) continue;
+            inRange++;
+            inRangeNames.add(p.name());
+            PlayerProfile prof = data.profile(p.name());
+            if (prof != null) {
+                profiled++;
+                if (RecruitmentAddon.isRecruitable(prof) && !RecruitmentAddon.isExcluded(p.name())) recruitable.add(p);
+            }
+        }
+        // nudge any missing profiles so a follow-up scan fills in
+        if (!inRangeNames.isEmpty()) data.requestProfiles(inRangeNames);
+
+        feedback(source, "§eScan: §f" + online.size() + "§7 online · §f" + inRange + "§7 within " + range
+                + "m · §f" + profiled + "§7 profiled · §a" + recruitable.size() + "§7 recruitable ("
+                + modeName(c.recruitableMode) + ")");
+
+        if (online.isEmpty()) {
+            feedback(source, "§7No online data yet — wait ~5s after joining and make sure you're on EarthMC.");
+        } else if (inRange > profiled) {
+            feedback(source, "§7Still loading player data — run §f/recruit scan§7 again in a few seconds.");
+        } else if (recruitable.isEmpty()) {
+            feedback(source, "§7No " + modeName(c.recruitableMode) + " players in range. Try §f/recruit mode 2§7 or raise the HUD range.");
+        }
+        recruitable.sort(Comparator.comparingDouble(p -> RecruitmentAddon.distance(px, pz, p.x(), p.z())));
+        for (LivePlayer p : recruitable) {
             int dist = (int) Math.round(RecruitmentAddon.distance(px, pz, p.x(), p.z()));
             feedback(source, " §7- §f" + p.name() + " §7(" + dist + "m, " + p.x() + ", " + p.z() + ")");
         }

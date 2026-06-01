@@ -49,7 +49,9 @@ public final class JoinAlerter {
         for (LivePlayer p : online) current.add(key(p.name()));
 
         if (!baselineSet) {
-            previousOnline.clear();
+            // The online poll is async — until the first real list arrives, treat
+            // nobody as "new" (otherwise everyone already online looks like a join).
+            if (current.isEmpty()) return;
             previousOnline.addAll(current);
             baselineSet = true;
             return;
