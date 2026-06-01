@@ -8,72 +8,85 @@ import net.minecraft.util.Formatting;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
 import net.recruitmentaddon.api.EarthMcData;
-import net.recruitmentaddon.model.LivePlayer;
 import net.recruitmentaddon.model.PlayerProfile;
 
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * Watches the online-player feed and, when a <i>newly-registered</i> player first
- * appears online, sends a clickable chat message; clicking it runs the configured
- * recruit command for that player.
+ * Watches the server player list. When a player who wasn't online before appears, and
+ * the official API confirms their account is newly registered, a clickable chat line is
+ * posted; clicking it runs the configured recruit command for that player.
  *
- * Players already online when you join are taken as the baseline (no alert), so you
- * only get pinged for genuine new arrivals.
+ * The player list populates incrementally right after you connect, so everyone seen in
+ * the first few seconds is taken as the baseline — you're only pinged for genuine joins.
  */
 public final class JoinAlerter {
 
-    private final Set<String> previousOnline = new HashSet<>();
-    private final Set<String> pending = new HashSet<>();   // appeared, awaiting profile decision
-    private final Set<String> alerted = new HashSet<>();   // already pinged this session
-    private boolean baselineSet = false;
+    /** Window after (re)connect during which arrivals are treated as the baseline. */
+    private static final long GRACE_MS = 8_000L;
+
+    private final Set<String> previousOnline = new HashSet<>(); // lower-case keys
+    private final Set<String> pending = new HashSet<>();        // original names, awaiting profile
+    private final Set<String> alerted = new HashSet<>();        // lower-case keys, pinged this session
+    private boolean graceStarted = false;
+    private long graceUntil = 0L;
 
     public void reset() {
         previousOnline.clear();
         pending.clear();
         alerted.clear();
-        baselineSet = false;
+        graceStarted = false;
+        graceUntil = 0L;
     }
 
-    public void update(List<LivePlayer> online, EarthMcData data, RecruitmentConfig config) {
-        if (!config.enabled || !config.newPlayerAlertEnabled) {
-            // Keep the baseline current so toggling on later doesn't dump everyone.
-            refreshBaseline(online);
+    public void update(Set<String> online, EarthMcData data, RecruitmentConfig config) {
+        if (online.isEmpty()) return; // player list not populated yet
+
+        Map<String, String> currentByKey = new HashMap<>();
+        for (String n : online) currentByKey.put(key(n), n);
+        Set<String> currentKeys = currentByKey.keySet();
+
+        // Disabled → keep the baseline fresh so toggling on later doesn't dump everyone.
+        if (!config.enabled) {
+            previousOnline.clear();
+            previousOnline.addAll(currentKeys);
+            pending.clear();
+            graceStarted = true;
+            graceUntil = 0L;
             return;
         }
 
-        Set<String> current = new HashSet<>();
-        for (LivePlayer p : online) current.add(key(p.name()));
-
-        if (!baselineSet) {
-            // The online poll is async — until the first real list arrives, treat
-            // nobody as "new" (otherwise everyone already online looks like a join).
-            if (current.isEmpty()) return;
-            previousOnline.addAll(current);
-            baselineSet = true;
+        long now = System.currentTimeMillis();
+        if (!graceStarted) {
+            graceStarted = true;
+            graceUntil = now + GRACE_MS;
+        }
+        if (now < graceUntil) {
+            previousOnline.addAll(currentKeys); // still settling — everyone is baseline
             return;
         }
 
-        // New arrivals since last poll → start tracking them.
-        for (LivePlayer p : online) {
-            String k = key(p.name());
-            if (!previousOnline.contains(k) && !alerted.contains(k) && !RecruitmentAddon.isExcluded(p.name())) {
-                pending.add(k);
+        // Genuine new arrivals since the last poll.
+        for (String k : currentKeys) {
+            String name = currentByKey.get(k);
+            if (!previousOnline.contains(k) && !alerted.contains(k) && !RecruitmentAddon.isExcluded(name)) {
+                pending.add(name);
             }
         }
 
-        // Resolve pending arrivals as their profiles arrive.
         if (!pending.isEmpty()) {
-            data.requestProfiles(pending.stream().toList());
-            pending.removeIf(k -> {
-                if (!current.contains(k)) return true;            // left before we decided
-                PlayerProfile profile = data.profile(k);
-                if (profile == null) return false;                // still waiting on data
+            data.requestProfiles(pending);
+            pending.removeIf(name -> {
+                String k = key(name);
+                if (!currentKeys.contains(k)) return true;         // left before we decided
+                PlayerProfile profile = data.profile(name);
+                if (profile == null) return false;                 // still waiting on the API
                 if (profile.newlyRegistered(config.newPlayerMaxDays)) {
-                    alert(profile.name(), config);
+                    postRecruitMessage(profile.name(), config);
                     alerted.add(k);
                 }
                 return true;                                       // decided either way
@@ -81,22 +94,16 @@ public final class JoinAlerter {
         }
 
         previousOnline.clear();
-        previousOnline.addAll(current);
+        previousOnline.addAll(currentKeys);
     }
 
-    private void refreshBaseline(List<LivePlayer> online) {
-        previousOnline.clear();
-        for (LivePlayer p : online) previousOnline.add(key(p.name()));
-        baselineSet = true;
-        pending.clear();
-    }
-
-    private void alert(String name, RecruitmentConfig config) {
+    /** Posts the clickable recruit line for {@code name}. Shared by the alerter and {@code /recruit test}. */
+    public static void postRecruitMessage(String name, RecruitmentConfig config) {
         MinecraftClient mc = MinecraftClient.getInstance();
         String command = config.recruitMessage.replace("{player}", name);
         Text message = Text.literal("[Recruitment] ").formatted(Formatting.AQUA)
                 .append(Text.literal(name).formatted(Formatting.YELLOW))
-                .append(Text.literal(" is a new player online — ").formatted(Formatting.GRAY))
+                .append(Text.literal(" just joined as a new player — ").formatted(Formatting.GRAY))
                 .append(Text.literal("[Click to recruit]").styled(s -> s
                         .withColor(Formatting.GREEN)
                         .withBold(true)

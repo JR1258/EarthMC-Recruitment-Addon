@@ -33,31 +33,11 @@ public class RecruitmentConfigScreen extends Screen {
         int row = 24;
 
         addDrawableChild(CyclingButtonWidget.onOffBuilder(c.enabled)
-                .build(x, y, W, 20, Text.literal("Enabled"),
+                .build(x, y, W, 20, Text.literal("Join alerts"),
                        (b, v) -> { c.enabled = v; c.save(); }));
         y += row;
 
-        addDrawableChild(CyclingButtonWidget.builder(RecruitmentConfigScreen::modeText, c.recruitableMode)
-                .values(0, 1, 2)
-                .build(x, y, W, 20, Text.literal("Recruit target"),
-                       (b, v) -> { c.recruitableMode = v; c.save(); }));
-        y += row;
-
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.hudEnabled)
-                .build(x, y, W, 20, Text.literal("HUD list"),
-                       (b, v) -> { c.hudEnabled = v; c.save(); }));
-        y += row;
-
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.newPlayerAlertEnabled)
-                .build(x, y, W, 20, Text.literal("New-player join alerts"),
-                       (b, v) -> { c.newPlayerAlertEnabled = v; c.save(); }));
-        y += row;
-
-        addDrawableChild(new IntSlider(x, y, W, 20, 100, 3000, c.hudRange, "HUD range",
-                v -> { c.hudRange = v; c.save(); }));
-        y += row;
-
-        addDrawableChild(new IntSlider(x, y, W, 20, 1, 30, c.newPlayerMaxDays, "New-player max age (days)",
+        addDrawableChild(new IntSlider(x, y, W, 20, 1, 30, c.newPlayerMaxDays, "New-player window (days)",
                 v -> { c.newPlayerMaxDays = v; c.save(); }));
         y += row + 6;
 
@@ -86,14 +66,6 @@ public class RecruitmentConfigScreen extends Screen {
     @Override
     public void close() {
         this.client.setScreen(parent);
-    }
-
-    private static Text modeText(Integer mode) {
-        return Text.literal(switch (mode) {
-            case 1 -> "Townless or nationless";
-            case 2 -> "Newly registered";
-            default -> "Townless";
-        });
     }
 
     private static final class IntSlider extends SliderWidget {

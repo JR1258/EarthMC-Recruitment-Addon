@@ -5,7 +5,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.recruitmentaddon.RecruitmentConfig;
-import net.recruitmentaddon.model.LivePlayer;
 import net.recruitmentaddon.model.PlayerProfile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +16,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -25,16 +24,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Cached, shared-friendly access to EarthMC data.
+ * Cached access to the official EarthMC API. Only used to look up a player's
+ * town / nation / registration date, <b>batched</b> into one request and cached with a TTL.
  *
- * <ul>
- *   <li>{@link #pollOnline()} — online players + positions from squaremap (short poll).</li>
- *   <li>{@link #requestProfiles} — town / nation / registration from the official API,
- *       <b>batched</b> into a single request and cached with a TTL.</li>
- * </ul>
- *
- * One reused {@link HttpClient}; all parsing is pure Java (no Minecraft types), so this
- * class can later move into a shared EarthMC API library used by several mods.
+ * One reused {@link HttpClient}; parsing is pure Java (no Minecraft types), so this class
+ * can later move into a shared EarthMC API library used by several mods.
  */
 public final class EarthMcData {
 
@@ -46,10 +40,8 @@ public final class EarthMcData {
     private final HttpClient http;
     private final ExecutorService executor;
 
-    private volatile List<LivePlayer> online = List.of();
     private final Map<String, PlayerProfile> profiles = new ConcurrentHashMap<>();
     private final Map<String, Long> profileFetchedAt = new ConcurrentHashMap<>();
-    private final AtomicBoolean onlineFetchRunning = new AtomicBoolean(false);
     private final AtomicBoolean profileFetchRunning = new AtomicBoolean(false);
 
     public EarthMcData(RecruitmentConfig config) {
@@ -61,71 +53,15 @@ public final class EarthMcData {
                 .build();
     }
 
-    public List<LivePlayer> onlinePlayers() {
-        return online;
-    }
-
     /** Cached profile for a player, or null if not fetched yet. */
     public PlayerProfile profile(String name) {
         return profiles.get(key(name));
     }
 
     public void clear() {
-        online = List.of();
         profiles.clear();
         profileFetchedAt.clear();
     }
-
-    // ── Online players (squaremap) ─────────────────────────────────────────────
-
-    public void pollOnline() {
-        if (!onlineFetchRunning.compareAndSet(false, true)) return;
-        executor.execute(() -> {
-            try {
-                String json = get(config.playersUrl());
-                if (json != null) online = List.copyOf(parseOnline(json));
-            } catch (Exception e) {
-                LOGGER.debug("[Recruitment] online poll failed: {}", e.getMessage());
-            } finally {
-                onlineFetchRunning.set(false);
-            }
-        });
-    }
-
-    private List<LivePlayer> parseOnline(String json) {
-        List<LivePlayer> result = new ArrayList<>();
-        JsonElement root = JsonParser.parseString(json);
-        JsonArray arr = null;
-        if (root.isJsonObject() && root.getAsJsonObject().has("players")) {
-            arr = root.getAsJsonObject().getAsJsonArray("players");
-        } else if (root.isJsonArray()) {
-            arr = root.getAsJsonArray();
-        }
-        if (arr == null) return result;
-        for (JsonElement el : arr) {
-            if (!el.isJsonObject()) continue;
-            JsonObject p = el.getAsJsonObject();
-            String world = str(p, "world");
-            if (world != null && !world.contains("overworld")) continue;
-            if (p.has("hidden") && p.get("hidden").getAsBoolean()) continue;
-            String name = str(p, "name");
-            if (name == null || name.isBlank() || "?".equals(name)) continue;
-            int x, z;
-            if (p.has("position") && p.get("position").isJsonObject()) {
-                JsonObject pos = p.getAsJsonObject("position");
-                if (!pos.has("x") || !pos.has("z")) continue;
-                x = pos.get("x").getAsInt();
-                z = pos.get("z").getAsInt();
-            } else if (p.has("x") && p.has("z")) {
-                x = p.get("x").getAsInt();
-                z = p.get("z").getAsInt();
-            } else continue;
-            result.add(new LivePlayer(name, x, z));
-        }
-        return result;
-    }
-
-    // ── Profiles (official API, batched) ───────────────────────────────────────
 
     /** Fetches town/nation/registration for the given names that are missing or stale. */
     public void requestProfiles(Collection<String> names) {
@@ -183,20 +119,6 @@ public final class EarthMcData {
 
     // ── HTTP ────────────────────────────────────────────────────────────────--
 
-    private String get(String url) {
-        try {
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(20))
-                    .header("User-Agent", "EarthMC-Recruitment-Addon/1.0 (Fabric Mod)")
-                    .GET().build();
-            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-            return resp.statusCode() == 200 ? resp.body() : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     private String post(String url, String body) {
         try {
             HttpRequest req = HttpRequest.newBuilder()
@@ -215,7 +137,7 @@ public final class EarthMcData {
     // ── helpers ────────────────────────────────────────────────────────────---
 
     private static String key(String name) {
-        return name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        return name == null ? "" : name.toLowerCase(Locale.ROOT);
     }
 
     private static String str(JsonObject obj, String k) {

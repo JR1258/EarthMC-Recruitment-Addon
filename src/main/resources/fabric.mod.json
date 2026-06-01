@@ -3,7 +3,7 @@
   "id": "recruitmentaddon",
   "version": "${version}",
   "name": "EarthMC Recruitment Addon",
-  "description": "Finds recruitable players on EarthMC (townless / newly-registered) and helps you reach out.",
+  "description": "Posts a clickable recruit message when a newly-registered player joins your EarthMC server.",
   "authors": ["JR1258"],
   "contact": {
     "homepage": "https://github.com/JR1258/EarthMC-Recruitment-Addon",

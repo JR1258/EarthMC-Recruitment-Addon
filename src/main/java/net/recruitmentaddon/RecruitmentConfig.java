@@ -18,41 +18,31 @@ public class RecruitmentConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "recruitmentaddon.json";
 
-    /** Master switch for the whole addon (HUD + alerts). */
+    /** Master switch. When off, no join alerts are posted. */
     public boolean enabled = true;
 
-    // ── Who counts as "recruitable" ───────────────────────────────────────────
-    /** 0 = townless, 1 = townless or nationless, 2 = newly-registered players. */
-    public int recruitableMode = 0;
-    /** "Newly registered" threshold for mode 2 and the join alert, in days. */
+    /**
+     * A player counts as "new" if their account was registered within this many days.
+     * The alert only fires for players who join while you're online <i>and</i> are this
+     * new. Set to 1 for only just-registered players.
+     */
     public int newPlayerMaxDays = 7;
 
-    // ── HUD ───────────────────────────────────────────────────────────────────
-    public boolean hudEnabled = true;
-    /** Only list recruitable players within this many blocks (0 = unlimited). */
-    public int hudRange = 1000;
-    public int hudMaxEntries = 10;
-
-    // ── New-player join alert ─────────────────────────────────────────────────
-    public boolean newPlayerAlertEnabled = true;
     /**
-     * Command run when the alert message is clicked. {player} is substituted with
-     * the new player's name. Defaults to a private message.
+     * Command run when the alert message is clicked. {player} is substituted with the
+     * new player's name. Defaults to a private welcome message.
      */
     public String recruitMessage =
             "/msg {player} Hey {player}! Welcome to EarthMC — looking for a town? Message me!";
 
-    // ── General ───────────────────────────────────────────────────────────────
+    /** Only run while connected to an earthmc.net server. */
     public boolean earthmcOnly = true;
+
+    /** Players that never trigger an alert. */
     public List<String> excludedPlayers = new ArrayList<>();
 
-    // ── Endpoints (configurable per server, e.g. Aurora vs Nostra) ────────────
-    public String squaremapBaseUrl = "https://map.earthmc.net";
+    /** Official EarthMC API base (used only to look up a joiner's registration date). */
     public String earthmcApiBaseUrl = "https://api.earthmc.net/v4";
-
-    public String playersUrl() {
-        return squaremapBaseUrl + "/tiles/players.json";
-    }
 
     // ── Persistence ───────────────────────────────────────────────────────────
     public static RecruitmentConfig load() {
