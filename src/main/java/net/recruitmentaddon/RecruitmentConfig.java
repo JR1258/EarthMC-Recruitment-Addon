@@ -18,6 +18,9 @@ public class RecruitmentConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "recruitmentaddon.json";
 
+    /** Master switch for the whole addon (HUD + alerts). */
+    public boolean enabled = true;
+
     // ── Who counts as "recruitable" ───────────────────────────────────────────
     /** 0 = townless, 1 = townless or nationless, 2 = newly-registered players. */
     public int recruitableMode = 0;

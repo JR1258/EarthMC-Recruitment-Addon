@@ -7,7 +7,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.world.World;
+import net.recruitmentaddon.alert.JoinAlerter;
 import net.recruitmentaddon.api.EarthMcData;
+import net.recruitmentaddon.command.RecruitCommand;
+import net.recruitmentaddon.hud.RecruitmentHud;
 import net.recruitmentaddon.model.LivePlayer;
 import net.recruitmentaddon.model.PlayerProfile;
 import org.slf4j.Logger;
@@ -28,6 +31,7 @@ public class RecruitmentAddon implements ClientModInitializer {
     private static volatile List<LivePlayer> recruitableNearby = List.of();
 
     private long tickCounter = 0;
+    private final JoinAlerter joinAlerter = new JoinAlerter();
 
     @Override
     public void onInitializeClient() {
@@ -35,9 +39,13 @@ public class RecruitmentAddon implements ClientModInitializer {
         config = RecruitmentConfig.load();
         data = new EarthMcData(config);
 
+        RecruitmentHud.register();
+        RecruitCommand.register();
+
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             recruitableNearby = List.of();
+            joinAlerter.reset();
             if (data != null) data.clear();
         });
     }
@@ -55,6 +63,7 @@ public class RecruitmentAddon implements ClientModInitializer {
             }
             data.pollOnline();
             updateNearby(client.player);
+            joinAlerter.update(data.onlinePlayers(), data, config);
         } catch (Exception e) {
             LOGGER.debug("[Recruitment] tick failed: {}", e.getMessage());
         }

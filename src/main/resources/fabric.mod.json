@@ -12,7 +12,8 @@
   "license": "Apache-2.0",
   "environment": "client",
   "entrypoints": {
-    "client": ["net.recruitmentaddon.RecruitmentAddon"]
+    "client": ["net.recruitmentaddon.RecruitmentAddon"],
+    "modmenu": ["net.recruitmentaddon.gui.RecruitmentModMenuIntegration"]
   },
   "depends": {
     "fabricloader": ">=0.15.0",
