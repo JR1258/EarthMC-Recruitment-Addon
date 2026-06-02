@@ -4,6 +4,12 @@
   "version": "${version}",
   "name": "EarthMC Recruitment Addon",
   "description": "Posts a clickable recruit message when a newly-registered player joins your EarthMC server.",
+  "icon": {
+    "64": "assets/recruitmentaddon/icon-64.png",
+    "128": "assets/recruitmentaddon/icon-128.png",
+    "256": "assets/recruitmentaddon/icon-256.png",
+    "512": "assets/recruitmentaddon/icon-512.png"
+  },
   "authors": ["JR1258"],
   "contact": {
     "homepage": "https://github.com/JR1258/EarthMC-Recruitment-Addon",
@@ -15,6 +21,9 @@
     "client": ["net.recruitmentaddon.RecruitmentAddon"],
     "modmenu": ["net.recruitmentaddon.gui.RecruitmentModMenuIntegration"]
   },
+  "mixins": [
+    "recruitmentaddon.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.15.0",
     "fabric-api": "*",

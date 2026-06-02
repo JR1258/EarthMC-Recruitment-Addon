@@ -1,0 +1,279 @@
+name: Publish to Modrinth
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "GitHub release tag to publish to Modrinth, for example v1.0.1"
+        required: true
+      version_type:
+        description: "Modrinth version type"
+        required: true
+        default: "release"
+        type: choice
+        options:
+          - release
+          - beta
+          - alpha
+      game_version:
+        description: "Minecraft game version(s), comma-separated if needed, for example 1.21.11"
+        required: true
+        default: "1.21.11"
+      version_number:
+        description: "Optional Modrinth version number. Defaults to the tag without v."
+        required: false
+      replace_existing:
+        description: "Delete an existing Modrinth version with the same version number/game version before publishing."
+        required: true
+        default: false
+        type: boolean
+      changelog:
+        description: "Optional changelog override. If blank, the GitHub release notes are used."
+        required: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      GAME_VERSION: ${{ inputs.game_version || '1.21.11' }}
+      ICON_PATH: src/main/resources/assets/recruitmentaddon/icon-512.png
+      LOADER: "fabric"
+      MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID || 'earthmc-recruitment' }}
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+      PROJECT_DESCRIPTION: "Client-side EarthMC recruiting tool that prompts copyable recruit messages when newly registered players join."
+      PROJECT_ISSUES_URL: "https://github.com/JR1258/EarthMC-Recruitment-Addon/issues"
+      PROJECT_SOURCE_URL: "https://github.com/JR1258/EarthMC-Recruitment-Addon"
+      PROJECT_TITLE: "EarthMC Recruitment Addon"
+      REPLACE_EXISTING: ${{ inputs.replace_existing || false }}
+      VERSION_TYPE: ${{ inputs.version_type || 'release' }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout metadata assets
+        uses: actions/checkout@v4
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_VERSION_NUMBER: ${{ inputs.version_number }}
+          INPUT_CHANGELOG: ${{ inputs.changelog }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${MODRINTH_TOKEN}" ]]; then
+            echo "MODRINTH_TOKEN secret is not set." >&2
+            exit 1
+          fi
+          if [[ -z "${MODRINTH_PROJECT_ID}" ]]; then
+            echo "MODRINTH_PROJECT_ID repository variable is not set and no fallback project slug is configured." >&2
+            exit 1
+          fi
+
+          project="$(curl --fail-with-body \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
+            "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}")"
+          canonical_project_id="$(jq -r '.id // empty' <<< "${project}")"
+          if [[ -z "${canonical_project_id}" ]]; then
+            echo "Could not resolve Modrinth project id from ${MODRINTH_PROJECT_ID}." >&2
+            exit 1
+          fi
+          echo "MODRINTH_PROJECT_ID=${canonical_project_id}" >> "${GITHUB_ENV}"
+
+          tag="${INPUT_TAG}"
+          version_number="${INPUT_VERSION_NUMBER:-${tag#v}}"
+          name="EarthMC Recruitment Addon ${version_number}"
+          changelog="${INPUT_CHANGELOG}"
+          if [[ -z "${changelog}" ]]; then
+            changelog="$(gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" --json body --jq .body)"
+          fi
+
+          if [[ -z "${tag}" ]]; then
+            echo "No release tag was provided." >&2
+            exit 1
+          fi
+
+          printf '%s' "${changelog}" > changelog.md
+
+          {
+            echo "tag=${tag}"
+            echo "version_number=${version_number}"
+            echo "name=${name}"
+            echo "changelog_path=changelog.md"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Sync Modrinth project metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          jq -n \
+            --arg title "${PROJECT_TITLE}" \
+            --arg description "${PROJECT_DESCRIPTION}" \
+            --arg source_url "${PROJECT_SOURCE_URL}" \
+            --arg issues_url "${PROJECT_ISSUES_URL}" \
+            '{
+              title: $title,
+              description: $description,
+              client_side: "required",
+              server_side: "unsupported",
+              categories: ["utility", "social"],
+              source_url: $source_url,
+              issues_url: $issues_url
+            }' > modrinth-project-data.json
+
+          curl --fail-with-body \
+            -X PATCH "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}" \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
+            -H "Content-Type: application/json" \
+            --data-binary "@modrinth-project-data.json"
+
+      - name: Sync Modrinth project icon
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f "${ICON_PATH}" ]]; then
+            echo "Icon file not found: ${ICON_PATH}" >&2
+            exit 1
+          fi
+
+          icon_size="$(wc -c < "${ICON_PATH}")"
+          if (( icon_size > 262144 )); then
+            echo "Icon is ${icon_size} bytes, but Modrinth allows at most 262144 bytes." >&2
+            exit 1
+          fi
+
+          curl --fail-with-body \
+            -X PATCH "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}/icon?ext=png" \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
+            -H "Content-Type: image/png" \
+            --data-binary "@${ICON_PATH}"
+
+      - name: Download release jar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          primary_game_version="${GAME_VERSION%%,*}"
+          gh release download "${{ steps.meta.outputs.tag }}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "*.jar" \
+            --clobber \
+            --dir dist
+
+          jar="$(find dist -type f -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' | grep -F "${primary_game_version}" | sort | head -n 1 || true)"
+          if [[ -z "${jar}" ]]; then
+            jar="$(find dist -type f -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' | sort | head -n 1)"
+          fi
+          if [[ -z "${jar}" ]]; then
+            echo "No publishable jar found in GitHub release assets." >&2
+            exit 1
+          fi
+          echo "JAR_PATH=${jar}" >> "${GITHUB_ENV}"
+
+      - name: Delete existing Modrinth version
+        if: ${{ inputs.replace_existing }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ids="$(curl --fail-with-body \
+              -H "Authorization: ${MODRINTH_TOKEN}" \
+              -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
+              "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}/version" \
+            | jq -r \
+                --arg version_number "${{ steps.meta.outputs.version_number }}" \
+                --arg game_versions "${GAME_VERSION}" \
+                '
+                  ($game_versions | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $wanted
+                  | .[]
+                  | select(.version_number == $version_number and ([.game_versions[] as $version | $wanted | index($version)] | any))
+                  | .id
+                ')"
+
+          if [[ -z "${ids}" ]]; then
+            echo "No existing Modrinth version matched ${{ steps.meta.outputs.version_number }} for ${GAME_VERSION}."
+            exit 0
+          fi
+
+          while IFS= read -r id; do
+            [[ -z "${id}" ]] && continue
+            echo "Deleting existing Modrinth version ${id}."
+            curl --fail-with-body \
+              -X DELETE "https://api.modrinth.com/v2/version/${id}" \
+              -H "Authorization: ${MODRINTH_TOKEN}" \
+              -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions"
+          done <<< "${ids}"
+
+      - name: Publish version
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          changelog="$(cat "${{ steps.meta.outputs.changelog_path }}")"
+
+          jq -n \
+            --arg name "${{ steps.meta.outputs.name }}" \
+            --arg version_number "${{ steps.meta.outputs.version_number }}" \
+            --arg changelog "${changelog}" \
+            --arg project_id "${MODRINTH_PROJECT_ID}" \
+            --arg game_versions "${GAME_VERSION}" \
+            --arg loader "${LOADER}" \
+            --arg version_type "${VERSION_TYPE}" \
+            '{
+              name: $name,
+              version_number: $version_number,
+              changelog: $changelog,
+              dependencies: [],
+              game_versions: ($game_versions | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))),
+              version_type: $version_type,
+              loaders: [$loader],
+              featured: true,
+              project_id: $project_id,
+              file_parts: ["file"],
+              primary_file: "file"
+            }' > modrinth-data.json
+
+          response="$(curl --fail-with-body \
+            -X POST "https://api.modrinth.com/v2/version" \
+            -H "Authorization: ${MODRINTH_TOKEN}" \
+            -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
+            -F "data=@modrinth-data.json;type=application/json" \
+            -F "file=@${JAR_PATH};type=application/java-archive")"
+          printf '%s' "${response}" > modrinth-version-response.json
+          echo "version_id=$(jq -r '.id' modrinth-version-response.json)" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify Modrinth file hash lookup
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_id="${{ steps.publish.outputs.version_id }}"
+          sha1="$(sha1sum "${JAR_PATH}" | awk '{print $1}')"
+
+          lookup="$(jq -n --arg hash "${sha1}" '{hashes: [$hash], algorithm: "sha1"}' \
+            | curl --fail-with-body \
+                -X POST "https://api.modrinth.com/v2/version_files" \
+                -H "Content-Type: application/json" \
+                -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
+                --data-binary @-)"
+
+          project_id="$(jq -r --arg hash "${sha1}" '.[$hash].project_id // empty' <<< "${lookup}")"
+          resolved_version_id="$(jq -r --arg hash "${sha1}" '.[$hash].id // empty' <<< "${lookup}")"
+
+          if [[ "${project_id}" != "${MODRINTH_PROJECT_ID}" || "${resolved_version_id}" != "${version_id}" ]]; then
+            echo "Uploaded jar is not publicly linked to the expected Modrinth project/version." >&2
+            echo "sha1=${sha1}" >&2
+            echo "expected project=${MODRINTH_PROJECT_ID} version=${version_id}" >&2
+            echo "resolved project=${project_id} version=${resolved_version_id}" >&2
+            exit 1
+          fi
+
+          echo "Verified ${JAR_PATH} is linked to Modrinth project ${project_id}, version ${resolved_version_id}."

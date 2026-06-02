@@ -15,10 +15,15 @@ public record PlayerProfile(String name, String town, String nation, long regist
         return nation == null || nation.isBlank();
     }
 
-    /** True if the account registered within the last {@code maxDays} days. */
-    public boolean newlyRegistered(int maxDays) {
-        if (registeredMs <= 0) return false;
+    /** Account age in whole seconds, or {@code Long.MAX_VALUE} if the registration time is unknown. */
+    public long ageSeconds() {
+        if (registeredMs <= 0) return Long.MAX_VALUE;
         long ageMs = System.currentTimeMillis() - registeredMs;
-        return ageMs >= 0 && ageMs <= maxDays * 24L * 60L * 60L * 1000L;
+        return ageMs < 0 ? 0 : ageMs / 1_000L;
+    }
+
+    /** True if the account registered within the last {@code maxSeconds} seconds. */
+    public boolean registeredWithinSeconds(int maxSeconds) {
+        return ageSeconds() <= maxSeconds;
     }
 }

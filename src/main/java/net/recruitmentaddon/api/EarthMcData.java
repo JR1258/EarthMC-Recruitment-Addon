@@ -34,15 +34,20 @@ public final class EarthMcData {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("RecruitmentAddon");
     private static final long PROFILE_TTL_MS = 60_000L;
+    private static final long ONLINE_TTL_MS = 5_000L;
     private static final int MAX_QUERY_BATCH = 50;
 
     private final RecruitmentConfig config;
     private final HttpClient http;
     private final ExecutorService executor;
+    private final TownyMapProfileBridge townyMapBridge;
 
     private final Map<String, PlayerProfile> profiles = new ConcurrentHashMap<>();
     private final Map<String, Long> profileFetchedAt = new ConcurrentHashMap<>();
+    private final Map<String, String> onlineNames = new ConcurrentHashMap<>();
     private final AtomicBoolean profileFetchRunning = new AtomicBoolean(false);
+    private final AtomicBoolean onlineFetchRunning = new AtomicBoolean(false);
+    private volatile long onlineFetchedAt = 0L;
 
     public EarthMcData(RecruitmentConfig config) {
         this.config = config;
@@ -51,27 +56,95 @@ public final class EarthMcData {
                 .connectTimeout(Duration.ofSeconds(10))
                 .executor(executor)
                 .build();
+        this.townyMapBridge = TownyMapProfileBridge.create();
     }
 
     /** Cached profile for a player, or null if not fetched yet. */
     public PlayerProfile profile(String name) {
-        return profiles.get(key(name));
+        String k = key(name);
+        PlayerProfile profile = profiles.get(k);
+        if (profile != null) return profile;
+        PlayerProfile bridged = townyMapBridge.cachedProfile(name);
+        if (bridged != null) {
+            cacheProfile(bridged, System.currentTimeMillis());
+            return bridged;
+        }
+        return null;
     }
 
     public void clear() {
         profiles.clear();
         profileFetchedAt.clear();
+        onlineNames.clear();
+        onlineFetchedAt = 0L;
+    }
+
+    /** Last fetched global online names from the official API. */
+    public java.util.Collection<String> onlineNames() {
+        return java.util.List.copyOf(onlineNames.values());
+    }
+
+    /** Refreshes the official online-player list, throttled to a short TTL. */
+    public void requestOnlinePlayers() {
+        long now = System.currentTimeMillis();
+        if (now - onlineFetchedAt < ONLINE_TTL_MS) return;
+        if (!onlineFetchRunning.compareAndSet(false, true)) return;
+        executor.execute(() -> {
+            try {
+                String json = get(config.earthmcApiBaseUrl + "/online");
+                if (json == null) return;
+                JsonElement root = JsonParser.parseString(json);
+                if (!root.isJsonObject()) return;
+                JsonObject object = root.getAsJsonObject();
+                if (!object.has("players") || !object.get("players").isJsonArray()) return;
+                Map<String, String> next = new ConcurrentHashMap<>();
+                for (JsonElement el : object.getAsJsonArray("players")) {
+                    if (!el.isJsonObject()) continue;
+                    String name = str(el.getAsJsonObject(), "name");
+                    if (name != null && !name.isBlank()) next.put(key(name), name);
+                }
+                onlineNames.clear();
+                onlineNames.putAll(next);
+                onlineFetchedAt = System.currentTimeMillis();
+            } catch (Exception e) {
+                LOGGER.debug("[Recruitment] online fetch failed: {}", e.getMessage());
+            } finally {
+                onlineFetchRunning.set(false);
+            }
+        });
     }
 
     /** Fetches town/nation/registration for the given names that are missing or stale. */
     public void requestProfiles(Collection<String> names) {
+        requestProfiles(names, false);
+    }
+
+    /** Fetches a single profile without using a cached registration timestamp. */
+    public void requestFreshProfile(String name) {
+        String k = key(name);
+        profiles.remove(k);
+        profileFetchedAt.remove(k);
+        requestProfiles(java.util.List.of(name), true);
+    }
+
+    private void requestProfiles(Collection<String> names, boolean forceFresh) {
         if (names.isEmpty()) return;
         long now = System.currentTimeMillis();
         ArrayList<String> needed = new ArrayList<>();
         for (String name : names) {
             String k = key(name);
             Long at = profileFetchedAt.get(k);
-            if (at == null || now - at >= PROFILE_TTL_MS) needed.add(name);
+            if (!forceFresh && at != null && now - at < PROFILE_TTL_MS) continue;
+            PlayerProfile bridged = townyMapBridge.cachedProfile(name);
+            if (bridged != null) {
+                cacheProfile(bridged, now);
+                continue;
+            }
+            if (townyMapBridge.requestProfile(name)) {
+                profileFetchedAt.put(k, now);
+                continue;
+            }
+            needed.add(name);
             if (needed.size() >= MAX_QUERY_BATCH) break;
         }
         if (needed.isEmpty()) return;
@@ -92,7 +165,7 @@ public final class EarthMcData {
                 for (JsonElement el : root.getAsJsonArray()) {
                     if (!el.isJsonObject()) continue;
                     PlayerProfile profile = parseProfile(el.getAsJsonObject());
-                    if (profile != null) profiles.put(key(profile.name()), profile);
+                    if (profile != null) cacheProfile(profile, fetchedAt);
                 }
             } catch (Exception e) {
                 LOGGER.debug("[Recruitment] profile batch failed: {}", e.getMessage());
@@ -117,6 +190,11 @@ public final class EarthMcData {
         return new PlayerProfile(name, town, nation, registeredMs);
     }
 
+    private void cacheProfile(PlayerProfile profile, long fetchedAt) {
+        profiles.put(key(profile.name()), profile);
+        profileFetchedAt.put(key(profile.name()), fetchedAt);
+    }
+
     // ── HTTP ────────────────────────────────────────────────────────────────--
 
     private String post(String url, String body) {
@@ -127,6 +205,20 @@ public final class EarthMcData {
                     .header("Content-Type", "application/json")
                     .header("User-Agent", "EarthMC-Recruitment-Addon/1.0 (Fabric Mod)")
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build();
+            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            return resp.statusCode() == 200 ? resp.body() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String get(String url) {
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("User-Agent", "EarthMC-Recruitment-Addon/1.0 (Fabric Mod)")
+                    .GET().build();
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             return resp.statusCode() == 200 ? resp.body() : null;
         } catch (Exception e) {
