@@ -131,8 +131,7 @@ jobs:
             -X PATCH "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
-            -H "Content-Type: application/json" \
-            --data-binary "@modrinth-project-data.json"
+            --json "@modrinth-project-data.json"
 
       - name: Sync Modrinth project icon
         shell: bash
@@ -155,7 +154,7 @@ jobs:
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
             -H "Content-Type: image/png" \
-            --data-binary "@${ICON_PATH}"
+            --upload-file "${ICON_PATH}"
 
       - name: Download release jar
         shell: bash

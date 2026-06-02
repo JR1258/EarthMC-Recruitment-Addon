@@ -47,4 +47,4 @@ jobs:
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
             -H "Content-Type: image/png" \
-            --data-binary "@${ICON_PATH}"
+            --upload-file "${ICON_PATH}"
