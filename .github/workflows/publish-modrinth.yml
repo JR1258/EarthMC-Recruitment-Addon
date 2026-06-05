@@ -122,7 +122,7 @@ jobs:
               description: $description,
               client_side: "required",
               server_side: "unsupported",
-              categories: ["utility", "social"],
+              categories: ["utility"],
               source_url: $source_url,
               issues_url: $issues_url
             }' > modrinth-project-data.json
