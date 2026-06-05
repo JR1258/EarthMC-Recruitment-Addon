@@ -2,11 +2,11 @@ package net.recruitmentaddon.command;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.recruitmentaddon.RecruitmentConfig;
 import net.recruitmentaddon.alert.GlobalAdReminder;
 import net.recruitmentaddon.alert.JoinAlerter;
@@ -19,69 +19,69 @@ public final class RecruitCommand {
 
     public static void register() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) ->
-            dispatcher.register(ClientCommandManager.literal("recruit")
+            dispatcher.register(ClientCommands.literal("recruit")
                 .executes(ctx -> status(ctx.getSource()))
-                .then(ClientCommandManager.literal("status").executes(ctx -> status(ctx.getSource())))
-                .then(ClientCommandManager.literal("on").executes(ctx -> setEnabled(ctx.getSource(), true)))
-                .then(ClientCommandManager.literal("off").executes(ctx -> setEnabled(ctx.getSource(), false)))
-                .then(ClientCommandManager.literal("sound")
-                    .then(ClientCommandManager.literal("on").executes(ctx -> setSound(ctx.getSource(), true)))
-                    .then(ClientCommandManager.literal("off").executes(ctx -> setSound(ctx.getSource(), false))))
-                .then(ClientCommandManager.literal("window")
-                    .then(ClientCommandManager.argument("seconds", IntegerArgumentType.integer(10, 300))
+                .then(ClientCommands.literal("status").executes(ctx -> status(ctx.getSource())))
+                .then(ClientCommands.literal("on").executes(ctx -> setEnabled(ctx.getSource(), true)))
+                .then(ClientCommands.literal("off").executes(ctx -> setEnabled(ctx.getSource(), false)))
+                .then(ClientCommands.literal("sound")
+                    .then(ClientCommands.literal("on").executes(ctx -> setSound(ctx.getSource(), true)))
+                    .then(ClientCommands.literal("off").executes(ctx -> setSound(ctx.getSource(), false))))
+                .then(ClientCommands.literal("window")
+                    .then(ClientCommands.argument("seconds", IntegerArgumentType.integer(10, 300))
                         .executes(ctx -> setWindow(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "seconds")))))
-                .then(ClientCommandManager.literal("cooldown")
-                    .then(ClientCommandManager.argument("minutes", IntegerArgumentType.integer(0, 1440))
+                .then(ClientCommands.literal("cooldown")
+                    .then(ClientCommands.argument("minutes", IntegerArgumentType.integer(0, 1440))
                         .executes(ctx -> setCooldown(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "minutes")))))
-                .then(ClientCommandManager.literal("delay")
-                    .then(ClientCommandManager.argument("seconds", IntegerArgumentType.integer(0, 300))
+                .then(ClientCommands.literal("delay")
+                    .then(ClientCommands.argument("seconds", IntegerArgumentType.integer(0, 300))
                         .executes(ctx -> setDelay(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "seconds")))))
-                .then(ClientCommandManager.literal("message")
-                    .then(ClientCommandManager.argument("text", StringArgumentType.greedyString())
+                .then(ClientCommands.literal("message")
+                    .then(ClientCommands.argument("text", StringArgumentType.greedyString())
                         .executes(ctx -> setRecruitMessage(ctx.getSource(), StringArgumentType.getString(ctx, "text")))))
-                .then(ClientCommandManager.literal("townphrase")
-                    .then(ClientCommandManager.argument("text", StringArgumentType.greedyString())
+                .then(ClientCommands.literal("townphrase")
+                    .then(ClientCommands.argument("text", StringArgumentType.greedyString())
                         .executes(ctx -> setTownPhrase(ctx.getSource(), StringArgumentType.getString(ctx, "text")))))
-                .then(ClientCommandManager.literal("ad")
-                    .then(ClientCommandManager.literal("on").executes(ctx -> setGlobalAd(ctx.getSource(), true)))
-                    .then(ClientCommandManager.literal("off").executes(ctx -> setGlobalAd(ctx.getSource(), false)))
-                    .then(ClientCommandManager.literal("test").executes(ctx -> testGlobalAd(ctx.getSource())))
-                    .then(ClientCommandManager.literal("showitem")
-                        .then(ClientCommandManager.literal("on").executes(ctx -> setGlobalAdShowItem(ctx.getSource(), true)))
-                        .then(ClientCommandManager.literal("off").executes(ctx -> setGlobalAdShowItem(ctx.getSource(), false))))
-                    .then(ClientCommandManager.literal("interval")
-                        .then(ClientCommandManager.argument("minutes", IntegerArgumentType.integer(5, 300))
+                .then(ClientCommands.literal("ad")
+                    .then(ClientCommands.literal("on").executes(ctx -> setGlobalAd(ctx.getSource(), true)))
+                    .then(ClientCommands.literal("off").executes(ctx -> setGlobalAd(ctx.getSource(), false)))
+                    .then(ClientCommands.literal("test").executes(ctx -> testGlobalAd(ctx.getSource())))
+                    .then(ClientCommands.literal("showitem")
+                        .then(ClientCommands.literal("on").executes(ctx -> setGlobalAdShowItem(ctx.getSource(), true)))
+                        .then(ClientCommands.literal("off").executes(ctx -> setGlobalAdShowItem(ctx.getSource(), false))))
+                    .then(ClientCommands.literal("interval")
+                        .then(ClientCommands.argument("minutes", IntegerArgumentType.integer(5, 300))
                             .executes(ctx -> setGlobalAdInterval(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "minutes")))))
-                    .then(ClientCommandManager.literal("message")
-                        .then(ClientCommandManager.argument("text", StringArgumentType.greedyString())
+                    .then(ClientCommands.literal("message")
+                        .then(ClientCommands.argument("text", StringArgumentType.greedyString())
                             .executes(ctx -> setGlobalAdMessage(ctx.getSource(), StringArgumentType.getString(ctx, "text"))))))
-                .then(ClientCommandManager.literal("test").executes(ctx -> test(ctx.getSource())))
-                .then(ClientCommandManager.literal("followup")
-                    .then(ClientCommandManager.literal("list").executes(ctx -> followUpList(ctx.getSource())))
-                    .then(ClientCommandManager.literal("test")
-                        .then(ClientCommandManager.argument("player", StringArgumentType.word())
+                .then(ClientCommands.literal("test").executes(ctx -> test(ctx.getSource())))
+                .then(ClientCommands.literal("followup")
+                    .then(ClientCommands.literal("list").executes(ctx -> followUpList(ctx.getSource())))
+                    .then(ClientCommands.literal("test")
+                        .then(ClientCommands.argument("player", StringArgumentType.word())
                             .executes(ctx -> followUpTest(ctx.getSource(), StringArgumentType.getString(ctx, "player")))))
-                    .then(ClientCommandManager.literal("remove")
-                        .then(ClientCommandManager.argument("title", StringArgumentType.word())
+                    .then(ClientCommands.literal("remove")
+                        .then(ClientCommands.argument("title", StringArgumentType.word())
                             .executes(ctx -> followUpRemove(ctx.getSource(), StringArgumentType.getString(ctx, "title")))))
-                    .then(ClientCommandManager.literal("add")
-                        .then(ClientCommandManager.argument("title", StringArgumentType.word())
-                            .then(ClientCommandManager.argument("message", StringArgumentType.greedyString())
+                    .then(ClientCommands.literal("add")
+                        .then(ClientCommands.argument("title", StringArgumentType.word())
+                            .then(ClientCommands.argument("message", StringArgumentType.greedyString())
                                 .executes(ctx -> followUpSet(ctx.getSource(), StringArgumentType.getString(ctx, "title"),
                                         StringArgumentType.getString(ctx, "message"), false)))))
-                    .then(ClientCommandManager.literal("set")
-                        .then(ClientCommandManager.argument("title", StringArgumentType.word())
-                            .then(ClientCommandManager.argument("message", StringArgumentType.greedyString())
+                    .then(ClientCommands.literal("set")
+                        .then(ClientCommands.argument("title", StringArgumentType.word())
+                            .then(ClientCommands.argument("message", StringArgumentType.greedyString())
                                 .executes(ctx -> followUpSet(ctx.getSource(), StringArgumentType.getString(ctx, "title"),
                                         StringArgumentType.getString(ctx, "message"), true))))))
-                .then(ClientCommandManager.literal("exclude")
-                    .then(ClientCommandManager.literal("add")
-                        .then(ClientCommandManager.argument("player", StringArgumentType.word())
+                .then(ClientCommands.literal("exclude")
+                    .then(ClientCommands.literal("add")
+                        .then(ClientCommands.argument("player", StringArgumentType.word())
                             .executes(ctx -> exclude(ctx.getSource(), StringArgumentType.getString(ctx, "player"), true))))
-                    .then(ClientCommandManager.literal("remove")
-                        .then(ClientCommandManager.argument("player", StringArgumentType.word())
+                    .then(ClientCommands.literal("remove")
+                        .then(ClientCommands.argument("player", StringArgumentType.word())
                             .executes(ctx -> exclude(ctx.getSource(), StringArgumentType.getString(ctx, "player"), false))))
-                    .then(ClientCommandManager.literal("list").executes(ctx -> excludeList(ctx.getSource()))))));
+                    .then(ClientCommands.literal("list").executes(ctx -> excludeList(ctx.getSource()))))));
     }
 
     private static int status(FabricClientCommandSource source) {
@@ -106,7 +106,7 @@ public final class RecruitCommand {
 
     private static int test(FabricClientCommandSource source) {
         RecruitmentConfig c = RecruitmentAddon.config();
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         String name = mc.player != null ? mc.player.getGameProfile().name() : "NewPlayer";
         feedback(source, "§7Posting a sample alert (click copies text for §f" + name + "§7):");
         JoinAlerter.postRecruitMessage(name, c);
@@ -279,6 +279,6 @@ public final class RecruitCommand {
     }
 
     private static void feedback(FabricClientCommandSource source, String msg) {
-        source.sendFeedback(Text.literal("§b[Recruitment] §7" + msg));
+        source.sendFeedback(Component.literal("§b[Recruitment] §7" + msg));
     }
 }

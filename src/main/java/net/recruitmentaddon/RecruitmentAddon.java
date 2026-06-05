@@ -3,8 +3,8 @@ package net.recruitmentaddon;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
 import net.recruitmentaddon.alert.GlobalAdReminder;
 import net.recruitmentaddon.alert.JoinAlerter;
 import net.recruitmentaddon.alert.TownJoinDetector;
@@ -61,7 +61,7 @@ public class RecruitmentAddon implements ClientModInitializer {
     public static RecruitmentConfig config() { return config; }
     public static EarthMcData data() { return data; }
 
-    private void onClientTick(MinecraftClient client) {
+    private void onClientTick(Minecraft client) {
         if (++tickCounter % POLL_INTERVAL_TICKS != 0) return;
         try {
             if (!isActiveOnEarthMc(client)) return;
@@ -74,7 +74,7 @@ public class RecruitmentAddon implements ClientModInitializer {
 
     public static void onPlayerListAddPacket(String name) {
         try {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (joinAlerter == null || data == null || config == null) return;
             if (!isActiveOnEarthMcServer(client)) return;
             String self = client.player != null ? client.player.getGameProfile().name() : null;
@@ -87,7 +87,7 @@ public class RecruitmentAddon implements ClientModInitializer {
 
     public static void onIncomingMessage(String message, boolean trustedSystemMessage) {
         try {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (joinAlerter == null || config == null) return;
             if (!isActiveOnEarthMcServer(client)) return;
             if (!trustedSystemMessage) return;
@@ -104,16 +104,16 @@ public class RecruitmentAddon implements ClientModInitializer {
         }
     }
 
-    private boolean isActiveOnEarthMc(MinecraftClient client) {
+    private boolean isActiveOnEarthMc(Minecraft client) {
         return isActiveOnEarthMcServer(client);
     }
 
-    private static boolean isActiveOnEarthMcServer(MinecraftClient client) {
-        if (client.getNetworkHandler() == null) return false;
+    private static boolean isActiveOnEarthMcServer(Minecraft client) {
+        if (client.getConnection() == null) return false;
         if (!config.earthmcOnly) return true;
-        ServerInfo server = client.getCurrentServerEntry();
-        return server != null && server.address != null
-                && server.address.toLowerCase(Locale.ROOT).contains("earthmc.net");
+        ServerData server = client.getCurrentServer();
+        return server != null && server.ip != null
+                && server.ip.toLowerCase(Locale.ROOT).contains("earthmc.net");
     }
 
     public static boolean isExcluded(String name) {

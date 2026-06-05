@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.14-SNAPSHOT'
+    id 'net.fabricmc.fabric-loom' version '1.16-SNAPSHOT'
     id 'maven-publish'
 }
 
@@ -14,10 +14,10 @@ repositories {
 
 dependencies {
     minecraft         "com.mojang:minecraft:${project.minecraft_version}"
-    mappings          "net.fabricmc:yarn:${project.yarn_mappings}:v2"
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-    modCompileOnly    "com.terraformersmc:modmenu:${project.modmenu_version}"
+    // MC 26.x ships unobfuscated, so Loom 1.16 reads names from the jar directly.
+    implementation    "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation    "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    compileOnly       "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
 processResources {
@@ -29,9 +29,14 @@ processResources {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
     withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 25
 }
 
 jar {
@@ -41,7 +46,7 @@ jar {
 }
 
 // Deploy the built jar to the local Modrinth launcher profile for testing.
-def modsDir = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/profiles/1.21.11/mods"))
+def modsDir = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/profiles/26.1.2/mods"))
 def oldModJarPrefixes = ['earthmc-recruitment-addon']
 def modrinthLauncherDb = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/app.db"))
 
@@ -106,8 +111,9 @@ def registerModrinthLauncherFile = { File deployedJar ->
 }
 
 tasks.register('deployToMods', Copy) {
-    dependsOn remapJar
-    from(remapJar.archiveFile)
+    // Loom 1.16 produces the final 26.x mod jar via the `jar` task.
+    dependsOn jar
+    from(jar.archiveFile)
     into(modsDir)
     doFirst {
         modsDir.listFiles()?.each { f ->
@@ -115,8 +121,8 @@ tasks.register('deployToMods', Copy) {
         }
     }
     doLast {
-        def deployedJar = new File(modsDir, remapJar.archiveFileName.get())
-        println "Deployed ${remapJar.archiveFileName.get()} → ${modsDir}"
+        def deployedJar = new File(modsDir, jar.archiveFileName.get())
+        println "Deployed ${jar.archiveFileName.get()} → ${modsDir}"
         registerModrinthLauncherFile(deployedJar)
     }
 }

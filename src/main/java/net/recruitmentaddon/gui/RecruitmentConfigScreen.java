@@ -1,13 +1,14 @@
 package net.recruitmentaddon.gui;
 
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.screen.ScreenTexts;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.network.chat.Component;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
 
@@ -28,13 +29,13 @@ public class RecruitmentConfigScreen extends Screen {
     private Page page = Page.GENERAL;
 
     public RecruitmentConfigScreen(Screen parent) {
-        super(Text.literal("EarthMC Recruitment Settings"));
+        super(Component.literal("EarthMC Recruitment Settings"));
         this.parent = parent;
     }
 
     @Override
     protected void init() {
-        clearChildren();
+        clearWidgets();
         labels.clear();
         RecruitmentConfig c = RecruitmentAddon.config();
         int x = this.width / 2 - W / 2;
@@ -42,10 +43,10 @@ public class RecruitmentConfigScreen extends Screen {
 
         int tabW = W / Page.values().length;
         for (Page p : Page.values()) {
-            addDrawableChild(ButtonWidget.builder(Text.literal((p == page ? "§l" : "") + p.title), b -> {
+            addRenderableWidget(Button.builder(Component.literal((p == page ? "§l" : "") + p.title), b -> {
                 page = p;
                 init();
-            }).dimensions(x + p.ordinal() * tabW, y, tabW - 2, FIELD_H).build());
+            }).bounds(x + p.ordinal() * tabW, y, tabW - 2, FIELD_H).build());
         }
 
         y = 64;
@@ -57,43 +58,43 @@ public class RecruitmentConfigScreen extends Screen {
             case ADVANCED -> initAdvanced(c, x, y);
         }
 
-        addDrawableChild(ButtonWidget.builder(ScreenTexts.DONE, b -> close())
-                .dimensions(x, this.height - 28, W, FIELD_H).build());
+        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> onClose())
+                .bounds(x, this.height - 28, W, FIELD_H).build());
     }
 
     private void initGeneral(RecruitmentConfig c, int x, int y) {
         addSection("Detection", x, y);
         y += 14;
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.enabled)
-                .build(x, y, W, FIELD_H, Text.literal("Join alerts"),
+        addRenderableWidget(CycleButton.onOffBuilder(c.enabled)
+                .create(x, y, W, FIELD_H, Component.literal("Join alerts"),
                         (b, v) -> { c.enabled = v; c.save(); }));
         y += 24;
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.soundEnabled)
-                .build(x, y, W, FIELD_H, Text.literal("Sound"),
+        addRenderableWidget(CycleButton.onOffBuilder(c.soundEnabled)
+                .create(x, y, W, FIELD_H, Component.literal("Sound"),
                         (b, v) -> { c.soundEnabled = v; c.save(); }));
         y += 24;
-        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 10, 300, c.newPlayerMaxSeconds,
+        addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 10, 300, c.newPlayerMaxSeconds,
                 "New-player window (seconds)", v -> { c.newPlayerMaxSeconds = v; c.save(); }));
         y += 24;
-        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 0, 300, c.alertDelaySeconds,
+        addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 0, 300, c.alertDelaySeconds,
                 "Recruit prompt delay (seconds)", v -> { c.alertDelaySeconds = v; c.save(); }));
         y += 24;
-        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 0, 120, c.alertCooldownMinutes,
+        addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 0, 120, c.alertCooldownMinutes,
                 "Duplicate cooldown (minutes)", v -> { c.alertCooldownMinutes = v; c.save(); }));
     }
 
     private void initAds(RecruitmentConfig c, int x, int y) {
         addSection("Global Chat Ad Reminder", x, y);
         y += 14;
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.globalAdReminderEnabled)
-                .build(x, y, W, FIELD_H, Text.literal("Global ad reminder"),
+        addRenderableWidget(CycleButton.onOffBuilder(c.globalAdReminderEnabled)
+                .create(x, y, W, FIELD_H, Component.literal("Global ad reminder"),
                         (b, v) -> { c.globalAdReminderEnabled = v; c.save(); }));
         y += 24;
-        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 5, 300, c.globalAdReminderMinutes,
+        addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 5, 300, c.globalAdReminderMinutes,
                 "Ad reminder interval (minutes)", v -> { c.globalAdReminderMinutes = v; c.save(); }));
         y += 24;
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.globalAdUseShowItem)
-                .build(x, y, W, FIELD_H, Text.literal("Use /showitem"),
+        addRenderableWidget(CycleButton.onOffBuilder(c.globalAdUseShowItem)
+                .create(x, y, W, FIELD_H, Component.literal("Use /showitem"),
                         (b, v) -> { c.globalAdUseShowItem = v; c.save(); }));
         y += 32;
         addTextField("Global ad copy message", c.globalAdMessage, x, y, W, 512, s -> {
@@ -134,13 +135,13 @@ public class RecruitmentConfigScreen extends Screen {
                 item.title = s;
                 c.save();
             });
-            addDrawableChild(ButtonWidget.builder(Text.literal("Remove"), b -> {
+            addRenderableWidget(Button.builder(Component.literal("Remove"), b -> {
                 if (removeIndex < c.followUpMessages.size()) {
                     c.followUpMessages.remove(removeIndex);
                     c.save();
                     init();
                 }
-            }).dimensions(x + W - 78, itemY + LABEL_GAP, 78, FIELD_H).build());
+            }).bounds(x + W - 78, itemY + LABEL_GAP, 78, FIELD_H).build());
             addTextField("Message copied by this button", safe(item.message), x, itemY + 34, W, 512, s -> {
                 item.message = s;
                 c.save();
@@ -149,18 +150,18 @@ public class RecruitmentConfigScreen extends Screen {
         }
 
         int addY = Math.min(this.height - 56, y + index * 66 + 4);
-        addDrawableChild(ButtonWidget.builder(Text.literal("Add Follow-Up"), b -> {
+        addRenderableWidget(Button.builder(Component.literal("Add Follow-Up"), b -> {
             c.followUpMessages.add(new RecruitmentConfig.FollowUpMessage("New", "Welcome, {player}!"));
             c.save();
             init();
-        }).dimensions(x, addY, W, FIELD_H).build());
+        }).bounds(x, addY, W, FIELD_H).build());
     }
 
     private void initAdvanced(RecruitmentConfig c, int x, int y) {
         addSection("Scope", x, y);
         y += 14;
-        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.earthmcOnly)
-                .build(x, y, W, FIELD_H, Text.literal("Only on earthmc.net"),
+        addRenderableWidget(CycleButton.onOffBuilder(c.earthmcOnly)
+                .create(x, y, W, FIELD_H, Component.literal("Only on earthmc.net"),
                         (b, v) -> { c.earthmcOnly = v; c.save(); }));
         y += 32;
         addTextField("EarthMC API base URL", c.earthmcApiBaseUrl, x, y, W, 256, s -> {
@@ -176,11 +177,11 @@ public class RecruitmentConfigScreen extends Screen {
 
     private void addTextField(String label, String value, int x, int y, int width, int maxLength, TextConsumer changed) {
         addLabel(label, x, y);
-        TextFieldWidget field = new TextFieldWidget(this.textRenderer, x, y + LABEL_GAP, width, FIELD_H, Text.literal(label));
+        EditBox field = new EditBox(this.font, x, y + LABEL_GAP, width, FIELD_H, Component.literal(label));
         field.setMaxLength(maxLength);
-        field.setText(value == null ? "" : value);
-        field.setChangedListener(changed::accept);
-        addDrawableChild(field);
+        field.setValue(value == null ? "" : value);
+        field.setResponder(changed::accept);
+        addRenderableWidget(field);
     }
 
     private void addSection(String text, int x, int y) {
@@ -192,17 +193,17 @@ public class RecruitmentConfigScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        super.render(ctx, mouseX, mouseY, delta);
-        ctx.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 16, 0xFFFFFFFF);
+    public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(ctx, mouseX, mouseY, delta);
+        ctx.centeredText(this.font, this.title, this.width / 2, 16, 0xFFFFFFFF);
         for (Label label : labels) {
-            ctx.drawTextWithShadow(this.textRenderer, Text.literal(label.text()), label.x(), label.y(), 0xFFFFFFFF);
+            ctx.text(this.font, Component.literal(label.text()), label.x(), label.y(), 0xFFFFFFFF);
         }
     }
 
     @Override
-    public void close() {
-        this.client.setScreen(parent);
+    public void onClose() {
+        Minecraft.getInstance().setScreen(parent);
     }
 
     private static List<String> parseCsv(String value) {
@@ -238,13 +239,13 @@ public class RecruitmentConfigScreen extends Screen {
         void accept(String value);
     }
 
-    private static final class IntSlider extends SliderWidget {
+    private static final class IntSlider extends AbstractSliderButton {
         private final int min, max;
         private final String label;
         private final IntConsumer apply;
 
         IntSlider(int x, int y, int w, int h, int min, int max, int initial, String label, IntConsumer apply) {
-            super(x, y, w, h, Text.empty(), clampValue(min, max, initial));
+            super(x, y, w, h, Component.empty(), clampValue(min, max, initial));
             this.min = min;
             this.max = max;
             this.label = label;
@@ -263,7 +264,7 @@ public class RecruitmentConfigScreen extends Screen {
 
         @Override
         protected void updateMessage() {
-            setMessage(Text.literal(label + ": " + current()));
+            setMessage(Component.literal(label + ": " + current()));
         }
 
         @Override

@@ -1,12 +1,12 @@
 package net.recruitmentaddon.alert;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.sound.PositionedSoundInstance;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.Text;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.sounds.SoundEvents;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
 import net.recruitmentaddon.api.EarthMcData;
@@ -108,50 +108,50 @@ public final class JoinAlerter {
     }
 
     public static void postFollowUpMessages(String name, RecruitmentConfig config) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         if (config.followUpMessages == null || config.followUpMessages.isEmpty()) return;
-        Text message = Text.literal("[Recruitment] ").formatted(Formatting.AQUA)
-                .append(Text.literal(name).formatted(Formatting.YELLOW))
-                .append(Text.literal(" joined your town — ").formatted(Formatting.GRAY));
+        Component message = Component.literal("[Recruitment] ").withStyle(ChatFormatting.AQUA)
+                .append(Component.literal(name).withStyle(ChatFormatting.YELLOW))
+                .append(Component.literal(" joined your town - ").withStyle(ChatFormatting.GRAY));
         boolean first = true;
         for (RecruitmentConfig.FollowUpMessage followUp : config.followUpMessages) {
             if (followUp == null || blank(followUp.title) || blank(followUp.message)) continue;
-            if (!first) message = message.copy().append(Text.literal(" ").formatted(Formatting.GRAY));
+            if (!first) message = message.copy().append(Component.literal(" ").withStyle(ChatFormatting.GRAY));
             first = false;
             String copied = followUp.message.replace("{player}", name);
-            message = message.copy().append(Text.literal("[" + followUp.title + "]").styled(s -> s
-                    .withColor(Formatting.GREEN)
+            message = message.copy().append(Component.literal("[" + followUp.title + "]").withStyle(s -> s
+                    .withColor(ChatFormatting.GREEN)
                     .withBold(true)
                     .withClickEvent(new ClickEvent.CopyToClipboard(copied))
-                    .withHoverEvent(new HoverEvent.ShowText(Text.literal("Copies: " + copied)))));
+                    .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copies: " + copied)))));
         }
-        Text finalMessage = message;
+        Component finalMessage = message;
         mc.execute(() -> {
-            if (mc.player != null) mc.player.sendMessage(finalMessage, false);
+            if (mc.player != null) mc.player.sendSystemMessage(finalMessage);
             playPromptSound(mc, config);
         });
     }
 
     private static void postCopyPrompt(String name, RecruitmentConfig config, String reason, String button, String template) {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        Minecraft mc = Minecraft.getInstance();
         String copied = template.replace("{player}", name);
-        Text message = Text.literal("[Recruitment] ").formatted(Formatting.AQUA)
-                .append(Text.literal(name).formatted(Formatting.YELLOW))
-                .append(Text.literal(" " + reason + " — ").formatted(Formatting.GRAY))
-                .append(Text.literal("[" + button + "]").styled(s -> s
-                        .withColor(Formatting.GREEN)
+        Component message = Component.literal("[Recruitment] ").withStyle(ChatFormatting.AQUA)
+                .append(Component.literal(name).withStyle(ChatFormatting.YELLOW))
+                .append(Component.literal(" " + reason + " - ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("[" + button + "]").withStyle(s -> s
+                        .withColor(ChatFormatting.GREEN)
                         .withBold(true)
                         .withClickEvent(new ClickEvent.CopyToClipboard(copied))
-                        .withHoverEvent(new HoverEvent.ShowText(Text.literal("Copies: " + copied)))));
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copies: " + copied)))));
         mc.execute(() -> {
-            if (mc.player != null) mc.player.sendMessage(message, false);
+            if (mc.player != null) mc.player.sendSystemMessage(message);
             playPromptSound(mc, config);
         });
     }
 
-    private static void playPromptSound(MinecraftClient mc, RecruitmentConfig config) {
+    private static void playPromptSound(Minecraft mc, RecruitmentConfig config) {
         if (!config.soundEnabled) return;
-        mc.getSoundManager().play(PositionedSoundInstance.ui(SoundEvents.UI_BUTTON_CLICK, 1.2F));
+        mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.2F));
     }
 
     private static String key(String name) {
