@@ -36,19 +36,19 @@ public abstract class ClientPlayNetworkHandlerMixin {
     @Inject(method = "onGameMessage", at = @At("HEAD"))
     private void recruitmentAddon$onGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
         if (!packet.overlay()) {
-            RecruitmentAddon.onIncomingMessage(packet.content().getString());
+            RecruitmentAddon.onIncomingMessage(packet.content().getString(), true);
         }
     }
 
     @Inject(method = "onProfilelessChatMessage", at = @At("HEAD"))
     private void recruitmentAddon$onProfilelessChatMessage(ProfilelessChatMessageS2CPacket packet, CallbackInfo ci) {
-        RecruitmentAddon.onIncomingMessage(packet.message().getString());
+        RecruitmentAddon.onIncomingMessage(packet.message().getString(), true);
     }
 
     @Inject(method = "onChatMessage", at = @At("HEAD"))
     private void recruitmentAddon$onChatMessage(ChatMessageS2CPacket packet, CallbackInfo ci) {
         if (packet.unsignedContent() != null) {
-            RecruitmentAddon.onIncomingMessage(packet.unsignedContent().getString());
+            RecruitmentAddon.onIncomingMessage(packet.unsignedContent().getString(), false);
         }
     }
 }

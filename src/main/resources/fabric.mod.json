@@ -3,7 +3,7 @@
   "id": "recruitmentaddon",
   "version": "${version}",
   "name": "EarthMC Recruitment Addon",
-  "description": "Posts a clickable recruit message when a newly-registered player joins your EarthMC server.",
+  "description": "Client-side EarthMC recruiting assistant with new-player join alerts and copyable recruit messages.",
   "icon": {
     "64": "assets/recruitmentaddon/icon-64.png",
     "128": "assets/recruitmentaddon/icon-128.png",
@@ -12,7 +12,8 @@
   },
   "authors": ["JR1258"],
   "contact": {
-    "homepage": "https://github.com/JR1258/EarthMC-Recruitment-Addon",
+    "homepage": "https://modrinth.com/mod/earthmc-recruitment",
+    "sources": "https://github.com/JR1258/EarthMC-Recruitment-Addon",
     "issues": "https://github.com/JR1258/EarthMC-Recruitment-Addon/issues"
   },
   "license": "Apache-2.0",

@@ -43,7 +43,7 @@ jobs:
       LOADER: "fabric"
       MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID || 'earthmc-recruitment' }}
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-      PROJECT_DESCRIPTION: "Client-side EarthMC recruiting tool that prompts copyable recruit messages when newly registered players join."
+      PROJECT_DESCRIPTION: "Client-side EarthMC recruiting assistant that alerts on newly registered player joins and provides copyable recruit/follow-up messages."
       PROJECT_ISSUES_URL: "https://github.com/JR1258/EarthMC-Recruitment-Addon/issues"
       PROJECT_SOURCE_URL: "https://github.com/JR1258/EarthMC-Recruitment-Addon"
       PROJECT_TITLE: "EarthMC Recruitment Addon"
@@ -131,7 +131,8 @@ jobs:
             -X PATCH "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
-            --json "@modrinth-project-data.json"
+            -H "Content-Type: application/json" \
+            --data-binary "@modrinth-project-data.json"
 
       - name: Sync Modrinth project icon
         shell: bash
@@ -154,7 +155,7 @@ jobs:
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
             -H "Content-Type: image/png" \
-            --upload-file "${ICON_PATH}"
+            --data-binary "@${ICON_PATH}"
 
       - name: Download release jar
         shell: bash

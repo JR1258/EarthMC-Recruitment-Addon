@@ -34,7 +34,6 @@ public final class EarthMcData {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("RecruitmentAddon");
     private static final long PROFILE_TTL_MS = 60_000L;
-    private static final long ONLINE_TTL_MS = 5_000L;
     private static final int MAX_QUERY_BATCH = 50;
 
     private final RecruitmentConfig config;
@@ -44,10 +43,7 @@ public final class EarthMcData {
 
     private final Map<String, PlayerProfile> profiles = new ConcurrentHashMap<>();
     private final Map<String, Long> profileFetchedAt = new ConcurrentHashMap<>();
-    private final Map<String, String> onlineNames = new ConcurrentHashMap<>();
     private final AtomicBoolean profileFetchRunning = new AtomicBoolean(false);
-    private final AtomicBoolean onlineFetchRunning = new AtomicBoolean(false);
-    private volatile long onlineFetchedAt = 0L;
 
     public EarthMcData(RecruitmentConfig config) {
         this.config = config;
@@ -75,43 +71,6 @@ public final class EarthMcData {
     public void clear() {
         profiles.clear();
         profileFetchedAt.clear();
-        onlineNames.clear();
-        onlineFetchedAt = 0L;
-    }
-
-    /** Last fetched global online names from the official API. */
-    public java.util.Collection<String> onlineNames() {
-        return java.util.List.copyOf(onlineNames.values());
-    }
-
-    /** Refreshes the official online-player list, throttled to a short TTL. */
-    public void requestOnlinePlayers() {
-        long now = System.currentTimeMillis();
-        if (now - onlineFetchedAt < ONLINE_TTL_MS) return;
-        if (!onlineFetchRunning.compareAndSet(false, true)) return;
-        executor.execute(() -> {
-            try {
-                String json = get(config.earthmcApiBaseUrl + "/online");
-                if (json == null) return;
-                JsonElement root = JsonParser.parseString(json);
-                if (!root.isJsonObject()) return;
-                JsonObject object = root.getAsJsonObject();
-                if (!object.has("players") || !object.get("players").isJsonArray()) return;
-                Map<String, String> next = new ConcurrentHashMap<>();
-                for (JsonElement el : object.getAsJsonArray("players")) {
-                    if (!el.isJsonObject()) continue;
-                    String name = str(el.getAsJsonObject(), "name");
-                    if (name != null && !name.isBlank()) next.put(key(name), name);
-                }
-                onlineNames.clear();
-                onlineNames.putAll(next);
-                onlineFetchedAt = System.currentTimeMillis();
-            } catch (Exception e) {
-                LOGGER.debug("[Recruitment] online fetch failed: {}", e.getMessage());
-            } finally {
-                onlineFetchRunning.set(false);
-            }
-        });
     }
 
     /** Fetches town/nation/registration for the given names that are missing or stale. */
@@ -138,10 +97,6 @@ public final class EarthMcData {
             PlayerProfile bridged = townyMapBridge.cachedProfile(name);
             if (bridged != null) {
                 cacheProfile(bridged, now);
-                continue;
-            }
-            if (townyMapBridge.requestProfile(name)) {
-                profileFetchedAt.put(k, now);
                 continue;
             }
             needed.add(name);
@@ -205,20 +160,6 @@ public final class EarthMcData {
                     .header("Content-Type", "application/json")
                     .header("User-Agent", "EarthMC-Recruitment-Addon/1.0 (Fabric Mod)")
                     .POST(HttpRequest.BodyPublishers.ofString(body)).build();
-            HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-            return resp.statusCode() == 200 ? resp.body() : null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String get(String url) {
-        try {
-            HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(15))
-                    .header("User-Agent", "EarthMC-Recruitment-Addon/1.0 (Fabric Mod)")
-                    .GET().build();
             HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
             return resp.statusCode() == 200 ? resp.body() : null;
         } catch (Exception e) {

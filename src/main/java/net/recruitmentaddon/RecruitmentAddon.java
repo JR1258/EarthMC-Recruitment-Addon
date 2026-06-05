@@ -85,11 +85,12 @@ public class RecruitmentAddon implements ClientModInitializer {
         }
     }
 
-    public static void onIncomingMessage(String message) {
+    public static void onIncomingMessage(String message, boolean trustedSystemMessage) {
         try {
             MinecraftClient client = MinecraftClient.getInstance();
             if (joinAlerter == null || config == null) return;
             if (!isActiveOnEarthMcServer(client)) return;
+            if (!trustedSystemMessage) return;
             String player = TownJoinDetector.joinedPlayer(message, config);
             if (player == null || isExcluded(player)) return;
             String key = player.toLowerCase(Locale.ROOT);

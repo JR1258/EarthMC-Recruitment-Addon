@@ -9,21 +9,20 @@ import java.lang.reflect.Method;
 
 /**
  * Optional bridge into EarthMC Map Addon's player-detail cache. This keeps the
- * recruitment addon standalone, while avoiding duplicate /v4/players lookups
- * when Towny Map is also installed and active.
+ * recruitment addon standalone, while reusing data Towny Map already loaded.
+ * It intentionally does not ask Towny Map to perform new lookups, so recruiting
+ * checks cannot compete with town popup requests in the map addon.
  */
 final class TownyMapProfileBridge {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("RecruitmentAddon");
     private static final String TOWNY_MAP_MOD_ID = "townymapaddon";
-    private static final TownyMapProfileBridge DISABLED = new TownyMapProfileBridge(null, null);
+    private static final TownyMapProfileBridge DISABLED = new TownyMapProfileBridge(null);
 
     private final Method profileMethod;
-    private final Method requestMethod;
 
-    private TownyMapProfileBridge(Method profileMethod, Method requestMethod) {
+    private TownyMapProfileBridge(Method profileMethod) {
         this.profileMethod = profileMethod;
-        this.requestMethod = requestMethod;
     }
 
     static TownyMapProfileBridge create() {
@@ -31,9 +30,8 @@ final class TownyMapProfileBridge {
         try {
             Class<?> modClass = Class.forName("net.townymap.TownyMapMod");
             Method profile = modClass.getMethod("recruitmentPlayerProfile", String.class);
-            Method request = modClass.getMethod("requestRecruitmentPlayerProfile", String.class);
-            LOGGER.info("[Recruitment] Using Towny Map profile bridge");
-            return new TownyMapProfileBridge(profile, request);
+            LOGGER.info("[Recruitment] Using Towny Map profile cache bridge");
+            return new TownyMapProfileBridge(profile);
         } catch (ReflectiveOperationException | LinkageError e) {
             LOGGER.debug("[Recruitment] Towny Map profile bridge unavailable: {}", e.getMessage());
             return DISABLED;
@@ -41,7 +39,7 @@ final class TownyMapProfileBridge {
     }
 
     boolean available() {
-        return profileMethod != null && requestMethod != null;
+        return profileMethod != null;
     }
 
     PlayerProfile cachedProfile(String name) {
@@ -58,16 +56,6 @@ final class TownyMapProfileBridge {
         } catch (ReflectiveOperationException | RuntimeException e) {
             LOGGER.debug("[Recruitment] Towny Map cached profile read failed: {}", e.getMessage());
             return null;
-        }
-    }
-
-    boolean requestProfile(String name) {
-        if (!available() || name == null || name.isBlank()) return false;
-        try {
-            return Boolean.TRUE.equals(requestMethod.invoke(null, name));
-        } catch (ReflectiveOperationException | RuntimeException e) {
-            LOGGER.debug("[Recruitment] Towny Map profile request failed: {}", e.getMessage());
-            return false;
         }
     }
 

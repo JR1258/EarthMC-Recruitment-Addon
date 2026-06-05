@@ -13,10 +13,8 @@ import net.recruitmentaddon.api.EarthMcData;
 import net.recruitmentaddon.model.PlayerProfile;
 
 import java.util.Locale;
-import java.util.Map;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * Consumes server player-list ADD_PLAYER packets. When the official API confirms the
@@ -36,16 +34,12 @@ public final class JoinAlerter {
     private final Map<String, PendingJoin> pending = new HashMap<>(); // lower-case key -> pending join
     private final Map<String, Long> alertedAt = new HashMap<>();      // lower-case keys -> last alert time
     private final Map<String, ScheduledAlert> scheduled = new HashMap<>();
-    private final Set<String> previousOnline = new HashSet<>();       // official online-list baseline
-    private boolean onlineBaselineReady = false;
     private long graceUntil = 0L;
 
     public void reset() {
         pending.clear();
         scheduled.clear();
         alertedAt.clear();
-        previousOnline.clear();
-        onlineBaselineReady = false;
         graceUntil = System.currentTimeMillis() + GRACE_MS;
     }
 
@@ -64,15 +58,11 @@ public final class JoinAlerter {
         if (!config.enabled) {
             pending.clear();
             scheduled.clear();
-            previousOnline.clear();
-            onlineBaselineReady = false;
             return;
         }
 
         long now = System.currentTimeMillis();
         postDueAlerts(config, now);
-        data.requestOnlinePlayers();
-        updateFromOnlineList(data.onlineNames(), data, config, now);
         if (pending.isEmpty()) return;
         pending.entrySet().removeIf(entry -> {
             PendingJoin join = entry.getValue();
@@ -93,36 +83,6 @@ public final class JoinAlerter {
             }
             return true;
         });
-    }
-
-    private void updateFromOnlineList(Iterable<String> onlineNames, EarthMcData data, RecruitmentConfig config, long now) {
-        Set<String> current = new HashSet<>();
-        Map<String, String> namesByKey = new HashMap<>();
-        for (String name : onlineNames) {
-            if (name == null || name.isBlank()) continue;
-            String k = key(name);
-            current.add(k);
-            namesByKey.put(k, name);
-        }
-        if (current.isEmpty()) return;
-        if (!onlineBaselineReady) {
-            previousOnline.clear();
-            previousOnline.addAll(current);
-            onlineBaselineReady = true;
-            return;
-        }
-        if (now < graceUntil) {
-            previousOnline.clear();
-            previousOnline.addAll(current);
-            return;
-        }
-        for (String k : current) {
-            if (!previousOnline.contains(k)) {
-                onPlayerAdded(namesByKey.get(k), data, config);
-            }
-        }
-        previousOnline.clear();
-        previousOnline.addAll(current);
     }
 
     /** Posts the clickable recruit line for {@code name}. Shared by the alerter and {@code /recruit test}. */

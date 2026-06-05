@@ -8,24 +8,43 @@ import java.util.regex.Pattern;
 
 public final class TownJoinDetector {
 
-    private static final Pattern USERNAME = Pattern.compile("([A-Za-z0-9_]{3,16})");
-
     private TownJoinDetector() {}
 
     public static String joinedPlayer(String message, RecruitmentConfig config) {
         if (message == null || config == null || blank(config.townJoinPhrase)) return null;
-        String lower = message.toLowerCase(Locale.ROOT);
-        String phrase = config.townJoinPhrase.toLowerCase(Locale.ROOT);
-        int phraseAt = lower.indexOf(phrase);
-        if (phraseAt < 0) return null;
-
-        String before = message.substring(0, phraseAt);
-        Matcher matcher = USERNAME.matcher(before);
-        String last = null;
+        Pattern joinLine = Pattern.compile(
+                "(?i)(?<![A-Za-z0-9_])([A-Za-z0-9_]{3,16})\\s+"
+                        + phrasePattern(config.townJoinPhrase)
+                        + "(?![A-Za-z0-9_])"
+        );
+        Matcher matcher = joinLine.matcher(message);
+        String player = null;
+        int playerStart = -1;
         while (matcher.find()) {
-            last = matcher.group(1);
+            player = matcher.group(1);
+            playerStart = matcher.start(1);
         }
-        return last;
+        if (player == null || looksLikePlayerChat(message, playerStart)) return null;
+        return player;
+    }
+
+    private static String phrasePattern(String phrase) {
+        String trimmed = phrase.trim();
+        String[] words = trimmed.split("\\s+");
+        StringBuilder pattern = new StringBuilder();
+        for (String word : words) {
+            if (pattern.length() > 0) pattern.append("\\s+");
+            pattern.append(Pattern.quote(word));
+        }
+        return pattern.toString();
+    }
+
+    private static boolean looksLikePlayerChat(String message, int playerStart) {
+        if (playerStart <= 0) return false;
+        String beforePlayer = message.substring(0, playerStart).toLowerCase(Locale.ROOT);
+        int colonAt = beforePlayer.lastIndexOf(':');
+        if (colonAt < 0) return false;
+        return !beforePlayer.substring(0, colonAt).contains("towny");
     }
 
     private static boolean blank(String value) {
