@@ -127,12 +127,14 @@ jobs:
               issues_url: $issues_url
             }' > modrinth-project-data.json
 
-          curl --fail-with-body \
+          if ! curl --fail-with-body \
             -X PATCH "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
             -H "Content-Type: application/json" \
-            --data-binary "@modrinth-project-data.json"
+            --data-binary "@modrinth-project-data.json"; then
+            echo "Modrinth project metadata sync failed; continuing so the version can still publish." >&2
+          fi
 
       - name: Sync Modrinth project icon
         shell: bash
@@ -150,12 +152,14 @@ jobs:
             exit 1
           fi
 
-          curl --fail-with-body \
+          if ! curl --fail-with-body \
             -X PATCH "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}/icon?ext=png" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
             -H "Content-Type: image/png" \
-            --data-binary "@${ICON_PATH}"
+            --data-binary "@${ICON_PATH}"; then
+            echo "Modrinth project icon sync failed; continuing so the version can still publish." >&2
+          fi
 
       - name: Download release jar
         shell: bash
