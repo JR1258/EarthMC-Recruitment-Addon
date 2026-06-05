@@ -73,6 +73,14 @@ jobs:
             echo "MODRINTH_PROJECT_ID repository variable is not set and no fallback project slug is configured." >&2
             exit 1
           fi
+          MODRINTH_TOKEN="${MODRINTH_TOKEN//$'\r'/}"
+          MODRINTH_TOKEN="${MODRINTH_TOKEN//$'\n'/}"
+          if [[ "${MODRINTH_TOKEN}" == \"*\" && "${MODRINTH_TOKEN}" == *\" ]]; then
+            MODRINTH_TOKEN="${MODRINTH_TOKEN:1:${#MODRINTH_TOKEN}-2}"
+            echo "MODRINTH_TOKEN had literal wrapping quotes; normalized before publishing."
+          fi
+          echo "::add-mask::${MODRINTH_TOKEN}"
+          echo "MODRINTH_TOKEN=${MODRINTH_TOKEN}" >> "${GITHUB_ENV}"
 
           project="$(curl --fail-with-body \
             -H "Authorization: ${MODRINTH_TOKEN}" \
@@ -250,8 +258,9 @@ jobs:
             -X POST "https://api.modrinth.com/v2/version" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
-            -F "data=@modrinth-data.json;type=application/json" \
-            -F "file=@${JAR_PATH};type=application/java-archive" \
+            -H "Expect:" \
+            -F "data=<modrinth-data.json;type=application/json" \
+            -F "file=@${JAR_PATH};filename=$(basename "${JAR_PATH}");type=application/java-archive" \
             -o modrinth-version-response.json; then
             echo "Modrinth version publish failed:" >&2
             cat modrinth-version-response.json >&2 || true
