@@ -10,7 +10,7 @@ jobs:
       contents: read
 
     env:
-      ICON_PATH: src/main/resources/assets/recruitmentaddon/icon-512.png
+      ICON_PATH: src/main/resources/assets/recruitmentaddon/icon-256.png
       MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID || 'earthmc-recruitment' }}
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
 

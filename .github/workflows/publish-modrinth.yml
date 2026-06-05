@@ -39,7 +39,7 @@ jobs:
 
     env:
       GAME_VERSION: ${{ inputs.game_version || '1.21.11' }}
-      ICON_PATH: src/main/resources/assets/recruitmentaddon/icon-512.png
+      ICON_PATH: src/main/resources/assets/recruitmentaddon/icon-256.png
       LOADER: "fabric"
       MODRINTH_PROJECT_ID: ${{ vars.MODRINTH_PROJECT_ID || 'earthmc-recruitment' }}
       MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
@@ -246,13 +246,17 @@ jobs:
               primary_file: "file"
             }' > modrinth-data.json
 
-          response="$(curl --fail-with-body \
+          if ! curl --fail-with-body \
             -X POST "https://api.modrinth.com/v2/version" \
             -H "Authorization: ${MODRINTH_TOKEN}" \
             -H "User-Agent: JR1258/EarthMC-Recruitment-Addon GitHub Actions" \
             -F "data=@modrinth-data.json;type=application/json" \
-            -F "file=@${JAR_PATH};type=application/java-archive")"
-          printf '%s' "${response}" > modrinth-version-response.json
+            -F "file=@${JAR_PATH};type=application/java-archive" \
+            -o modrinth-version-response.json; then
+            echo "Modrinth version publish failed:" >&2
+            cat modrinth-version-response.json >&2 || true
+            exit 1
+          fi
           echo "version_id=$(jq -r '.id' modrinth-version-response.json)" >> "${GITHUB_OUTPUT}"
 
       - name: Verify Modrinth file hash lookup
