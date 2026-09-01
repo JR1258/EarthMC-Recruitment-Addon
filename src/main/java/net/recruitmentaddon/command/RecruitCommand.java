@@ -20,6 +20,10 @@ public final class RecruitCommand {
     public static void register() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) ->
             dispatcher.register(ClientCommands.literal("recruit")
+                // New in 26.2. /recruit writes the config, so it must come from the user
+                // typing it — not from a text component the server made clickable.
+                // Gating the root literal covers every subcommand below it.
+                .requires(FabricClientCommandSource::attended)
                 .executes(ctx -> status(ctx.getSource()))
                 .then(ClientCommands.literal("status").executes(ctx -> status(ctx.getSource())))
                 .then(ClientCommands.literal("on").executes(ctx -> setEnabled(ctx.getSource(), true)))
