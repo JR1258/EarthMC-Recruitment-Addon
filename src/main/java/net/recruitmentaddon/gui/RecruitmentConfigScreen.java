@@ -203,7 +203,9 @@ public class RecruitmentConfigScreen extends Screen {
 
     @Override
     public void onClose() {
-        Minecraft.getInstance().setScreen(parent);
+        // 26.2 moved the current screen off Minecraft and onto Gui, which now owns the
+        // GUI components (the in-game HUD split out into Gui#hud at the same time).
+        Minecraft.getInstance().gui.setScreen(parent);
     }
 
     private static List<String> parseCsv(String value) {
