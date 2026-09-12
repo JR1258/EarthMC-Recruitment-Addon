@@ -46,7 +46,10 @@ jar {
 }
 
 // Deploy the built jar to the local Modrinth launcher profile for testing.
-def modsDir = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/profiles/26.1.2/mods"))
+// The profile folder name comes from `modrinth_profile` in gradle.properties, since
+// it does not always match minecraft_version — the launcher suffixes duplicates, so a
+// profile can be named e.g. "26.1.2 (1)".
+def modsDir = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/profiles/${project.modrinth_profile}/mods"))
 def oldModJarPrefixes = ['earthmc-recruitment-addon']
 def modrinthLauncherDb = file(new File(System.getProperty("user.home"), "Library/Application Support/ModrinthApp/app.db"))
 
