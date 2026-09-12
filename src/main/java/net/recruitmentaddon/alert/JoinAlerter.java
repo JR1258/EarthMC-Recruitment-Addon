@@ -87,7 +87,7 @@ public final class JoinAlerter {
 
     /** Posts the clickable recruit line for {@code name}. Shared by the alerter and {@code /recruit test}. */
     public static void postRecruitMessage(String name, RecruitmentConfig config) {
-        postCopyPrompt(name, config, "just joined as a new player", "Copy recruit message", config.recruitMessage);
+        postSuggestPrompt(name, config, "just joined as a new player", "Suggest recruit message", config.recruitMessage);
     }
 
     private void scheduleRecruitMessage(String key, String name, RecruitmentConfig config, long now) {
@@ -122,8 +122,10 @@ public final class JoinAlerter {
             message = message.copy().append(Text.literal("[" + followUp.title + "]").styled(s -> s
                     .withColor(Formatting.GREEN)
                     .withBold(true)
-                    .withClickEvent(new ClickEvent.CopyToClipboard(copied))
-                    .withHoverEvent(new HoverEvent.ShowText(Text.literal("Copies: " + copied)))));
+                    // Fills the chat bar with the text rather than silently copying to the
+                    // clipboard, so you can see and edit it before sending.
+                    .withClickEvent(new ClickEvent.SuggestCommand(copied))
+                    .withHoverEvent(new HoverEvent.ShowText(Text.literal("Suggests: " + copied)))));
         }
         Text finalMessage = message;
         mc.execute(() -> {
@@ -132,7 +134,7 @@ public final class JoinAlerter {
         });
     }
 
-    private static void postCopyPrompt(String name, RecruitmentConfig config, String reason, String button, String template) {
+    private static void postSuggestPrompt(String name, RecruitmentConfig config, String reason, String button, String template) {
         MinecraftClient mc = MinecraftClient.getInstance();
         String copied = template.replace("{player}", name);
         Text message = Text.literal("[Recruitment] ").formatted(Formatting.AQUA)
@@ -141,8 +143,10 @@ public final class JoinAlerter {
                 .append(Text.literal("[" + button + "]").styled(s -> s
                         .withColor(Formatting.GREEN)
                         .withBold(true)
-                        .withClickEvent(new ClickEvent.CopyToClipboard(copied))
-                        .withHoverEvent(new HoverEvent.ShowText(Text.literal("Copies: " + copied)))));
+                        // Fills the chat bar with the text rather than silently copying to the
+                        // clipboard, so you can see and edit it before sending.
+                        .withClickEvent(new ClickEvent.SuggestCommand(copied))
+                        .withHoverEvent(new HoverEvent.ShowText(Text.literal("Suggests: " + copied)))));
         mc.execute(() -> {
             if (mc.player != null) mc.player.sendMessage(message, false);
             playPromptSound(mc, config);

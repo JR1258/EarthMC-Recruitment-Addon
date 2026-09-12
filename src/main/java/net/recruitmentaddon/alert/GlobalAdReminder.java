@@ -35,11 +35,14 @@ public final class GlobalAdReminder {
     public static void postGlobalAdPrompt(RecruitmentConfig config) {
         MinecraftClient mc = MinecraftClient.getInstance();
         boolean useShowItem = config.globalAdUseShowItem;
-        String actionText = useShowItem ? "Suggest /showitem" : "Copy global ad";
-        String hoverText = useShowItem ? "Suggests: /showitem" : "Copies: " + config.globalAdMessage;
-        ClickEvent click = useShowItem
-                ? new ClickEvent.SuggestCommand("/showitem")
-                : new ClickEvent.CopyToClipboard(config.globalAdMessage == null ? "" : config.globalAdMessage);
+        // Both branches fill the chat bar rather than the clipboard, so you can see and
+        // edit the text before sending it; only the suggested string differs.
+        String suggested = useShowItem
+                ? "/showitem"
+                : (config.globalAdMessage == null ? "" : config.globalAdMessage);
+        String actionText = useShowItem ? "Suggest /showitem" : "Suggest global ad";
+        String hoverText = "Suggests: " + suggested;
+        ClickEvent click = new ClickEvent.SuggestCommand(suggested);
         Text message = Text.literal("[Recruitment] ").formatted(Formatting.AQUA)
                 .append(Text.literal("Global ad reminder — ").formatted(Formatting.GRAY))
                 .append(Text.literal("[" + actionText + "]").styled(s -> s
