@@ -87,7 +87,7 @@ public final class JoinAlerter {
 
     /** Posts the clickable recruit line for {@code name}. Shared by the alerter and {@code /recruit test}. */
     public static void postRecruitMessage(String name, RecruitmentConfig config) {
-        postCopyPrompt(name, config, "just joined as a new player", "Copy recruit message", config.recruitMessage);
+        postSuggestPrompt(name, config, "just joined as a new player", "Suggest recruit message", config.recruitMessage);
     }
 
     private void scheduleRecruitMessage(String key, String name, RecruitmentConfig config, long now) {
@@ -122,8 +122,10 @@ public final class JoinAlerter {
             message = message.copy().append(Component.literal("[" + followUp.title + "]").withStyle(s -> s
                     .withColor(ChatFormatting.GREEN)
                     .withBold(true)
-                    .withClickEvent(new ClickEvent.CopyToClipboard(copied))
-                    .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copies: " + copied)))));
+                    // Fills the chat bar with the text rather than silently copying to the
+                    // clipboard, so you can see and edit it before sending.
+                    .withClickEvent(new ClickEvent.SuggestCommand(copied))
+                    .withHoverEvent(new HoverEvent.ShowText(Component.literal("Suggests: " + copied)))));
         }
         Component finalMessage = message;
         mc.execute(() -> {
@@ -132,7 +134,7 @@ public final class JoinAlerter {
         });
     }
 
-    private static void postCopyPrompt(String name, RecruitmentConfig config, String reason, String button, String template) {
+    private static void postSuggestPrompt(String name, RecruitmentConfig config, String reason, String button, String template) {
         Minecraft mc = Minecraft.getInstance();
         String copied = template.replace("{player}", name);
         Component message = Component.literal("[Recruitment] ").withStyle(ChatFormatting.AQUA)
@@ -141,8 +143,10 @@ public final class JoinAlerter {
                 .append(Component.literal("[" + button + "]").withStyle(s -> s
                         .withColor(ChatFormatting.GREEN)
                         .withBold(true)
-                        .withClickEvent(new ClickEvent.CopyToClipboard(copied))
-                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Copies: " + copied)))));
+                        // Fills the chat bar with the text rather than silently copying to the
+                        // clipboard, so you can see and edit it before sending.
+                        .withClickEvent(new ClickEvent.SuggestCommand(copied))
+                        .withHoverEvent(new HoverEvent.ShowText(Component.literal("Suggests: " + copied)))));
         mc.execute(() -> {
             if (mc.player != null) mc.player.sendSystemMessage(message);
             playPromptSound(mc, config);
