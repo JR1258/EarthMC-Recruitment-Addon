@@ -1,0 +1,62 @@
+name: Build
+
+on:
+  push:
+    branches: ["main", "26.1.x", "26.2"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read target versions
+        id: props
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS='=' read -r key value; do
+            case "${key}" in
+              minecraft_version|mod_version) echo "${key}=${value}" >> "${GITHUB_OUTPUT}" ;;
+            esac
+          done < gradle.properties
+          cat "${GITHUB_OUTPUT}"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # 26.1+ targets Java 25; 1.21.11 targets 21. Both are installed so the
+          # Gradle toolchain can resolve whichever this branch asks for.
+          java-version: |
+            21
+            25
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build
+        shell: bash
+        # deployToMods copies the jar into a local Modrinth launcher profile, which
+        # is meaningless on a runner, so it is excluded here.
+        run: ./gradlew build -x deployToMods --stacktrace --no-daemon
+
+      - name: List build output
+        if: always()
+        shell: bash
+        run: ls -la build/libs || echo "no build/libs directory"
+
+      - name: Upload mod jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: earthmc-recruitment-addon-${{ steps.props.outputs.minecraft_version }}
+          path: |
+            build/libs/*.jar
+            !build/libs/*-sources.jar
+          if-no-files-found: error
