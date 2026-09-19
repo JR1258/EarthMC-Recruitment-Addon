@@ -15,7 +15,6 @@ import net.recruitmentaddon.alert.TownJoinDetector;
 import net.recruitmentaddon.alert.TownlessTracker;
 import net.recruitmentaddon.api.EarthMcData;
 import net.recruitmentaddon.command.RecruitCommand;
-import net.recruitmentaddon.command.TownlessCommand;
 import net.recruitmentaddon.gui.TownlessHud;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +47,6 @@ public class RecruitmentAddon implements ClientModInitializer {
         townlessTracker = new TownlessTracker();
 
         RecruitCommand.register();
-        TownlessCommand.register();
 
         ClientSendMessageEvents.COMMAND.register(cmd -> {
             if (townlessTracker != null) townlessTracker.onOutgoingCommand(cmd);
