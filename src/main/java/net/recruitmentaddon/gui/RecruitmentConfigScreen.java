@@ -10,6 +10,7 @@ import net.minecraft.screen.ScreenTexts;
 import net.minecraft.text.Text;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
+import net.recruitmentaddon.gui.TownlessHudEditorScreen;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -89,11 +90,18 @@ public class RecruitmentConfigScreen extends Screen {
         addDrawableChild(CyclingButtonWidget.onOffBuilder(c.townlessHudEnabled)
                 .build(x, y, W, FIELD_H, Text.literal("Townless HUD"),
                         (b, v) -> { c.townlessHudEnabled = v; c.save(); }));
+        y += 24;
+        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 1, 20, c.townlessHudMaxPlayers,
+                "Max players shown", v -> { c.townlessHudMaxPlayers = v; c.save(); }));
         y += 32;
-        addTextField("Min account age to appear (e.g. 1d, 12h, 30m, 90s)", c.townlessMinAge, x, y, W, 16, s -> {
+        int fieldW = W - 112;
+        addTextField("Min account age (e.g. 1d, 12h, 30m, 90s)", c.townlessMinAge, x, y, fieldW, 16, s -> {
             c.townlessMinAge = s.isBlank() ? "1d" : s.trim();
             c.save();
         });
+        addDrawableChild(ButtonWidget.builder(Text.literal("Position HUD"),
+                b -> this.client.setScreen(new TownlessHudEditorScreen()))
+                .dimensions(x + fieldW + 8, y + LABEL_GAP, 104, FIELD_H).build());
     }
 
     private void initAds(RecruitmentConfig c, int x, int y) {
