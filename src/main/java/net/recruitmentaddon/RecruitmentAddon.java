@@ -3,6 +3,7 @@ package net.recruitmentaddon;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -48,6 +49,10 @@ public class RecruitmentAddon implements ClientModInitializer {
 
         RecruitCommand.register();
         TownlessCommand.register();
+
+        ClientSendMessageEvents.COMMAND.register(cmd -> {
+            if (townlessTracker != null) townlessTracker.onOutgoingCommand(cmd);
+        });
 
         HudElementRegistry.addLast(
                 Identifier.fromNamespaceAndPath("recruitmentaddon", "townless_hud"),

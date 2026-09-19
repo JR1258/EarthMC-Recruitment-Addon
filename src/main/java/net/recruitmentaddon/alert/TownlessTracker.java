@@ -9,27 +9,28 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Tracks townless online players and manages the HUD display list.
- * Players are synced from the Minecraft player list each tick and filtered
- * by account age, town status, and invite state.
- */
 public final class TownlessTracker {
 
     private static final long GRACE_MS = 8_000L;
 
-    // "You have invited PlayerName to your town" / "PlayerName has been sent a town invitation"
     private static final Pattern INVITED = Pattern.compile(
             "(?i)invited\\s+([A-Za-z0-9_]{3,16})\\b|\\b([A-Za-z0-9_]{3,16})\\s+has been sent a town invitation"
     );
-    // /t invite sent response: "Pending town invitations: PlayerA, PlayerB"
     private static final Pattern INVITE_LIST = Pattern.compile(
             "(?i)pending\\s+(?:town\\s+)?invit(?:ation|e)s?\\s*[:\\s]\\s*([A-Za-z0-9_,\\s]+)"
     );
+    private static final Pattern OUTGOING_MSG = Pattern.compile(
+            "^(?:msg|w|whisper|tell|pm)\\s+([A-Za-z0-9_]{3,16})(?:\\s|$)",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern OUTGOING_TOWN = Pattern.compile(
+            "^t\\s+(?:add|invite)\\s+([A-Za-z0-9_]{3,16})(?:\\s|$)",
+            Pattern.CASE_INSENSITIVE
+    );
 
-    private final Map<String, String> onlinePlayers = new ConcurrentHashMap<>();     // lowercase -> display name
-    private final LinkedHashMap<String, String> townlessVisible = new LinkedHashMap<>(); // lowercase -> display name
-    private final Set<String> invited = ConcurrentHashMap.newKeySet();               // lowercase
+    private final Map<String, String> onlinePlayers = new ConcurrentHashMap<>();
+    private final LinkedHashMap<String, String> townlessVisible = new LinkedHashMap<>();
+    private final Set<String> invited = ConcurrentHashMap.newKeySet();
     private long graceUntil = 0L;
 
     public void reset() {
@@ -39,14 +40,12 @@ public final class TownlessTracker {
         graceUntil = System.currentTimeMillis() + GRACE_MS;
     }
 
-    /** Replaces the tracked online player map from the live Minecraft player list. */
     public void syncOnlinePlayers(Map<String, String> lowercaseToDisplay) {
         onlinePlayers.keySet().retainAll(lowercaseToDisplay.keySet());
         onlinePlayers.putAll(lowercaseToDisplay);
         townlessVisible.keySet().retainAll(lowercaseToDisplay.keySet());
     }
 
-    /** Marks a player as invited, removing them from the HUD list. */
     public void onInvited(String name) {
         if (name == null) return;
         String k = name.toLowerCase(Locale.ROOT);
@@ -54,7 +53,6 @@ public final class TownlessTracker {
         townlessVisible.remove(k);
     }
 
-    /** Parses incoming system messages for invite confirmations and /t invite sent output. */
     public void onMessage(String message) {
         if (message == null) return;
         Matcher m = INVITED.matcher(message);
@@ -72,6 +70,15 @@ public final class TownlessTracker {
         }
     }
 
+    /** Removes a player when you send them a message or /t add/invite them. */
+    public void onOutgoingCommand(String command) {
+        if (command == null) return;
+        Matcher m = OUTGOING_MSG.matcher(command);
+        if (m.find()) { onInvited(m.group(1)); return; }
+        m = OUTGOING_TOWN.matcher(command);
+        if (m.find()) { onInvited(m.group(1)); }
+    }
+
     public void update(EarthMcData data, RecruitmentConfig config) {
         if (!config.townlessHudEnabled) {
             townlessVisible.clear();
@@ -81,7 +88,14 @@ public final class TownlessTracker {
         if (now < graceUntil) return;
         long minAgeMs = parseAgeMs(config.townlessMinAge);
 
-        // Batch-request profiles we haven't fetched yet
+        // Re-filter existing visible entries when min-age setting changes
+        if (minAgeMs > 0) {
+            townlessVisible.entrySet().removeIf(e -> {
+                PlayerProfile p = data.profile(e.getKey());
+                return p != null && p.registeredMs() > 0 && now - p.registeredMs() < minAgeMs;
+            });
+        }
+
         List<String> toRequest = new ArrayList<>();
         for (Map.Entry<String, String> e : onlinePlayers.entrySet()) {
             if (!invited.contains(e.getKey()) && data.profile(e.getKey()) == null) {
@@ -90,7 +104,6 @@ public final class TownlessTracker {
         }
         if (!toRequest.isEmpty()) data.requestProfiles(toRequest);
 
-        // Promote confirmed-townless players to the visible list
         for (Map.Entry<String, String> e : new ArrayList<>(onlinePlayers.entrySet())) {
             String k = e.getKey();
             if (townlessVisible.containsKey(k) || invited.contains(k)) continue;
@@ -101,7 +114,6 @@ public final class TownlessTracker {
             townlessVisible.put(k, e.getValue());
         }
 
-        // Remove players who got a town since we last checked (profile TTL: 60s)
         townlessVisible.entrySet().removeIf(e -> {
             PlayerProfile p = data.profile(e.getKey());
             return p != null && !p.townless();
@@ -112,11 +124,6 @@ public final class TownlessTracker {
         return new ArrayList<>(townlessVisible.values());
     }
 
-    /**
-     * Parses a human-readable duration string into milliseconds.
-     * Accepted suffixes: d (days), h (hours), m (minutes), s (seconds).
-     * A bare number is treated as seconds. Returns 1 day on invalid input.
-     */
     public static long parseAgeMs(String age) {
         if (age == null || age.isBlank()) return 86_400_000L;
         String s = age.trim().toLowerCase(Locale.ROOT);

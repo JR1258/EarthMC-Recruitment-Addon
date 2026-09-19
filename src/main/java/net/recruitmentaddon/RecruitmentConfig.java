@@ -75,9 +75,17 @@ public class RecruitmentConfig {
     /**
      * Minimum account age for a player to appear in the townless HUD.
      * Accepts a number followed by d (days), h (hours), m (minutes), or s (seconds).
-     * Default "1d" hides brand-new accounts that are likely still deciding where to play.
      */
     public String townlessMinAge = "1d";
+
+    /** Maximum number of players to show in the townless HUD at once. */
+    public int townlessHudMaxPlayers = 10;
+
+    /** Saved HUD X position (top-left corner, in GUI pixels). */
+    public int townlessHudX = 4;
+
+    /** Saved HUD Y position (top-left corner, in GUI pixels). */
+    public int townlessHudY = 4;
 
     /** Only run while connected to an earthmc.net server. */
     public boolean earthmcOnly = true;
@@ -122,6 +130,7 @@ public class RecruitmentConfig {
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
         if (townlessMinAge == null || townlessMinAge.isBlank()) townlessMinAge = "1d";
+        if (townlessHudMaxPlayers < 1) townlessHudMaxPlayers = 10;
     }
 
     public static class FollowUpMessage {
