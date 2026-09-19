@@ -4,10 +4,12 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
 import net.recruitmentaddon.alert.TownlessTracker;
+import net.recruitmentaddon.gui.TownlessHudEditorScreen;
 
 /** Client command {@code /townless} — toggle and configure the townless player HUD. */
 public final class TownlessCommand {
@@ -24,6 +26,8 @@ public final class TownlessCommand {
                     .executes(ctx -> setEnabled(ctx.getSource(), true)))
                 .then(ClientCommands.literal("off")
                     .executes(ctx -> setEnabled(ctx.getSource(), false)))
+                .then(ClientCommands.literal("move")
+                    .executes(ctx -> openEditor(ctx.getSource())))
                 .then(ClientCommands.literal("minage")
                     .then(ClientCommands.argument("age", StringArgumentType.word())
                         .executes(ctx -> setMinAge(ctx.getSource(), StringArgumentType.getString(ctx, "age")))))));
@@ -54,6 +58,12 @@ public final class TownlessCommand {
         c.townlessMinAge = age;
         c.save();
         feedback(source, "Townless min account age set to §f" + age + "§7.");
+        return 1;
+    }
+
+    private static int openEditor(FabricClientCommandSource source) {
+        Minecraft mc = Minecraft.getInstance();
+        mc.execute(() -> mc.setScreen(new TownlessHudEditorScreen()));
         return 1;
     }
 
