@@ -52,6 +52,7 @@ public class RecruitmentConfigScreen extends Screen {
         y = 64;
         switch (page) {
             case GENERAL -> initGeneral(c, x, y);
+            case TOWNLESS -> initTownless(c, x, y);
             case ADS -> initAds(c, x, y);
             case MESSAGES -> initMessages(c, x, y);
             case FOLLOW_UPS -> initFollowUps(c, x, y);
@@ -81,6 +82,19 @@ public class RecruitmentConfigScreen extends Screen {
         y += 24;
         addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 0, 120, c.alertCooldownMinutes,
                 "Duplicate cooldown (minutes)", v -> { c.alertCooldownMinutes = v; c.save(); }));
+    }
+
+    private void initTownless(RecruitmentConfig c, int x, int y) {
+        addSection("Townless Player HUD", x, y);
+        y += 14;
+        addRenderableWidget(CycleButton.onOffBuilder(c.townlessHudEnabled)
+                .create(x, y, W, FIELD_H, Component.literal("Townless HUD"),
+                        (b, v) -> { c.townlessHudEnabled = v; c.save(); }));
+        y += 32;
+        addTextField("Min account age to appear (e.g. 1d, 12h, 30m, 90s)", c.townlessMinAge, x, y, W, 16, s -> {
+            c.townlessMinAge = s.isBlank() ? "1d" : s.trim();
+            c.save();
+        });
     }
 
     private void initAds(RecruitmentConfig c, int x, int y) {
@@ -222,6 +236,7 @@ public class RecruitmentConfigScreen extends Screen {
 
     private enum Page {
         GENERAL("General"),
+        TOWNLESS("Townless"),
         ADS("Ads"),
         MESSAGES("Messages"),
         FOLLOW_UPS("Follow"),
