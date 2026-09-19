@@ -69,6 +69,16 @@ public class RecruitmentConfig {
             new FollowUpMessage("Rules", "/msg {player} Quick note: please read the town rules when you have a minute.")
     ));
 
+    /** Shows a live list of townless (uninvited) players in the top-left corner. */
+    public boolean townlessHudEnabled = false;
+
+    /**
+     * Minimum account age for a player to appear in the townless HUD.
+     * Accepts a number followed by d (days), h (hours), m (minutes), or s (seconds).
+     * Default "1d" hides brand-new accounts that are likely still deciding where to play.
+     */
+    public String townlessMinAge = "1d";
+
     /** Only run while connected to an earthmc.net server. */
     public boolean earthmcOnly = true;
 
@@ -111,6 +121,7 @@ public class RecruitmentConfig {
         if (followUpMessages == null) followUpMessages = new ArrayList<>();
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
+        if (townlessMinAge == null || townlessMinAge.isBlank()) townlessMinAge = "1d";
     }
 
     public static class FollowUpMessage {

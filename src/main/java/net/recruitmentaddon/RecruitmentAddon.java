@@ -3,13 +3,18 @@ package net.recruitmentaddon;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.client.network.ServerInfo;
 import net.recruitmentaddon.alert.GlobalAdReminder;
 import net.recruitmentaddon.alert.JoinAlerter;
 import net.recruitmentaddon.alert.TownJoinDetector;
+import net.recruitmentaddon.alert.TownlessTracker;
 import net.recruitmentaddon.api.EarthMcData;
 import net.recruitmentaddon.command.RecruitCommand;
+import net.recruitmentaddon.command.TownlessCommand;
+import net.recruitmentaddon.gui.TownlessHud;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +36,7 @@ public class RecruitmentAddon implements ClientModInitializer {
     private static EarthMcData data;
     private static JoinAlerter joinAlerter;
     private static GlobalAdReminder globalAdReminder;
+    private static TownlessTracker townlessTracker;
     private static final Map<String, Long> followUpPromptedAt = new HashMap<>();
 
     private long tickCounter = 0;
@@ -42,17 +48,23 @@ public class RecruitmentAddon implements ClientModInitializer {
         data = new EarthMcData(config);
         joinAlerter = new JoinAlerter();
         globalAdReminder = new GlobalAdReminder();
+        townlessTracker = new TownlessTracker();
 
         RecruitCommand.register();
+        TownlessCommand.register();
+
+        HudRenderCallback.EVENT.register((ctx, tickDelta) -> TownlessHud.render(ctx));
 
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             joinAlerter.reset();
             globalAdReminder.reset();
+            townlessTracker.reset();
         });
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             joinAlerter.reset();
             globalAdReminder.reset();
+            townlessTracker.reset();
             followUpPromptedAt.clear();
             if (data != null) data.clear();
         });
@@ -60,6 +72,7 @@ public class RecruitmentAddon implements ClientModInitializer {
 
     public static RecruitmentConfig config() { return config; }
     public static EarthMcData data() { return data; }
+    public static TownlessTracker townlessTracker() { return townlessTracker; }
 
     private void onClientTick(MinecraftClient client) {
         if (++tickCounter % POLL_INTERVAL_TICKS != 0) return;
@@ -67,6 +80,16 @@ public class RecruitmentAddon implements ClientModInitializer {
             if (!isActiveOnEarthMc(client)) return;
             joinAlerter.update(data, config);
             globalAdReminder.update(config);
+            if (client.getNetworkHandler() != null) {
+                Map<String, String> online = new HashMap<>();
+                for (PlayerListEntry info : client.getNetworkHandler().getPlayerList()) {
+                    if (info.getProfile() == null) continue;
+                    String n = info.getProfile().name();
+                    if (n != null && !n.isBlank()) online.put(n.toLowerCase(Locale.ROOT), n);
+                }
+                townlessTracker.syncOnlinePlayers(online);
+            }
+            townlessTracker.update(data, config);
         } catch (Exception e) {
             LOGGER.debug("[Recruitment] tick failed: {}", e.getMessage());
         }
@@ -90,6 +113,9 @@ public class RecruitmentAddon implements ClientModInitializer {
             MinecraftClient client = MinecraftClient.getInstance();
             if (joinAlerter == null || config == null) return;
             if (!isActiveOnEarthMcServer(client)) return;
+            if (trustedSystemMessage && townlessTracker != null) {
+                townlessTracker.onMessage(message);
+            }
             if (!trustedSystemMessage) return;
             String player = TownJoinDetector.joinedPlayer(message, config);
             if (player == null || isExcluded(player)) return;
