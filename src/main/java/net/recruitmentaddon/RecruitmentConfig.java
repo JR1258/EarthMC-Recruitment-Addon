@@ -73,10 +73,11 @@ public class RecruitmentConfig {
     public boolean townlessHudEnabled = false;
 
     /**
-     * Minimum account age for a player to appear in the townless HUD.
+     * Maximum account age for a player to appear in the townless HUD.
+     * Players are removed once their account is older than this value.
      * Accepts a number followed by d (days), h (hours), m (minutes), or s (seconds).
      */
-    public String townlessMinAge = "1d";
+    public String townlessMaxAge = "7d";
 
     /** Maximum number of players to show in the townless HUD at once. */
     public int townlessHudMaxPlayers = 10;
@@ -129,7 +130,7 @@ public class RecruitmentConfig {
         if (followUpMessages == null) followUpMessages = new ArrayList<>();
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
-        if (townlessMinAge == null || townlessMinAge.isBlank()) townlessMinAge = "1d";
+        if (townlessMaxAge == null || townlessMaxAge.isBlank()) townlessMaxAge = "7d";
         if (townlessHudMaxPlayers < 1) townlessHudMaxPlayers = 10;
     }
 

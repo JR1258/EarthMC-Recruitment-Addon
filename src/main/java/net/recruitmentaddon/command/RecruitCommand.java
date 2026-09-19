@@ -36,9 +36,9 @@ public final class RecruitCommand {
                         .executes(ctx -> townlessSetEnabled(ctx.getSource(), false)))
                     .then(ClientCommands.literal("move")
                         .executes(ctx -> townlessOpenEditor(ctx.getSource())))
-                    .then(ClientCommands.literal("minage")
+                    .then(ClientCommands.literal("maxage")
                         .then(ClientCommands.argument("age", StringArgumentType.word())
-                            .executes(ctx -> townlessSetMinAge(ctx.getSource(), StringArgumentType.getString(ctx, "age"))))))));
+                            .executes(ctx -> townlessSetMaxAge(ctx.getSource(), StringArgumentType.getString(ctx, "age"))))))));
     }
 
     private static int setEnabled(FabricClientCommandSource source, boolean on) {
@@ -71,15 +71,15 @@ public final class RecruitCommand {
         return 1;
     }
 
-    private static int townlessSetMinAge(FabricClientCommandSource source, String age) {
+    private static int townlessSetMaxAge(FabricClientCommandSource source, String age) {
         if (TownlessTracker.parseAgeMs(age) <= 0) {
-            feedback(source, "§cInvalid format. Use e.g. §f1d§c, §f12h§c, §f30m§c, §f90s§c.");
+            feedback(source, "§cInvalid format. Use e.g. §f7d§c, §f24h§c, §f30m§c, §f90s§c.");
             return 0;
         }
         RecruitmentConfig c = RecruitmentAddon.config();
-        c.townlessMinAge = age;
+        c.townlessMaxAge = age;
         c.save();
-        feedback(source, "Townless min account age set to §f" + age + "§7.");
+        feedback(source, "Townless account window set to §f" + age + "§7.");
         return 1;
     }
 
