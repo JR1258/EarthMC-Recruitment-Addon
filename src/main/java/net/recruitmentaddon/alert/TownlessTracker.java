@@ -98,7 +98,10 @@ public final class TownlessTracker {
 
         List<String> toRequest = new ArrayList<>();
         for (Map.Entry<String, String> e : onlinePlayers.entrySet()) {
-            if (!invited.contains(e.getKey()) && data.profile(e.getKey()) == null) {
+            if (invited.contains(e.getKey())) continue;
+            // Always request if profile is missing; also refresh visible players so we
+            // detect when they join a town (EarthMcData TTL limits actual API calls)
+            if (data.profile(e.getKey()) == null || townlessVisible.containsKey(e.getKey())) {
                 toRequest.add(e.getValue());
             }
         }
