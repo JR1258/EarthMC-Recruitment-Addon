@@ -126,6 +126,7 @@ public class RecruitmentConfig {
     }
 
     private void ensureDefaults() {
+        enabled = true;
         if (excludedPlayers == null) excludedPlayers = new ArrayList<>();
         if (followUpMessages == null) followUpMessages = new ArrayList<>();
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
