@@ -132,6 +132,8 @@ public class RecruitmentAddon implements ClientModInitializer {
             if (!trustedSystemMessage) return;
             String player = TownJoinDetector.joinedPlayer(message, config);
             if (player == null || isExcluded(player)) return;
+            String self = client.player != null ? client.player.getGameProfile().name() : null;
+            if (self != null && self.equalsIgnoreCase(player)) return;
             String key = player.toLowerCase(Locale.ROOT);
             long now = System.currentTimeMillis();
             Long previous = followUpPromptedAt.get(key);
