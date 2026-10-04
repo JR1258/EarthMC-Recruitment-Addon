@@ -79,6 +79,8 @@ public final class JoinAlerter {
                 if (ageMs >= 0 && joinLagMs >= 0 && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
                     scheduleRecruitMessage(entry.getKey(), profile.name(), config, now);
                     alertedAt.put(entry.getKey(), System.currentTimeMillis());
+                    TownlessTracker tracker = RecruitmentAddon.townlessTracker();
+                    if (tracker != null) tracker.addJoinAlertPlayer(profile.name(), profile.registeredMs());
                 }
             }
             return true;
