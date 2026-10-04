@@ -18,7 +18,9 @@ public final class TownlessHud {
         RecruitmentConfig config = RecruitmentAddon.config();
         if (config == null || !config.townlessHudEnabled) return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.gui.screen() != null || mc.player == null) return;
+        if (mc.player == null) return;
+        net.minecraft.client.gui.screens.Screen screen = mc.gui.screen();
+        if (screen != null && !(screen instanceof net.minecraft.client.gui.screens.ChatScreen)) return;
         List<TownlessTracker.Entry> players = capped(RecruitmentAddon.townlessTracker().getDisplayList(), config.townlessHudMaxPlayers);
         if (players.isEmpty()) return;
         renderAt(ctx, mc.font, players, config.townlessHudX, config.townlessHudY);
