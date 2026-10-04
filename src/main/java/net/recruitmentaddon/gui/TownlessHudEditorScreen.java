@@ -10,13 +10,20 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.recruitmentaddon.RecruitmentAddon;
 import net.recruitmentaddon.RecruitmentConfig;
+import net.recruitmentaddon.alert.TownlessTracker;
 
 import java.util.List;
 
 /** Overlay that lets the player drag the townless HUD to any position. */
 public class TownlessHudEditorScreen extends Screen {
 
-    private static final List<String> PLACEHOLDER = List.of("Player1", "Player2");
+    private static List<TownlessTracker.Entry> placeholders() {
+        long now = System.currentTimeMillis();
+        return java.util.List.of(
+            new TownlessTracker.Entry("Player1", now - 7_200_000L),
+            new TownlessTracker.Entry("Player2", now - 172_800_000L)
+        );
+    }
     private static final int SNAP = 12;
 
     private int hudX, hudY;
@@ -43,7 +50,7 @@ public class TownlessHudEditorScreen extends Screen {
     public void extractRenderState(GuiGraphicsExtractor ctx, int mouseX, int mouseY, float delta) {
         super.extractRenderState(ctx, mouseX, mouseY, delta);
         Font font = Minecraft.getInstance().font;
-        List<String> players = liveOrPlaceholder();
+        List<TownlessTracker.Entry> players = liveOrPlaceholder();
         int w = TownlessHud.hudWidth(font, players);
         int h = TownlessHud.hudHeight(font, players);
 
@@ -63,7 +70,7 @@ public class TownlessHudEditorScreen extends Screen {
     public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
         if (event.button() == 0) {
             Font font = Minecraft.getInstance().font;
-            List<String> players = liveOrPlaceholder();
+            List<TownlessTracker.Entry> players = liveOrPlaceholder();
             int w = TownlessHud.hudWidth(font, players);
             int h = TownlessHud.hudHeight(font, players);
             double mx = event.x(), my = event.y();
@@ -81,7 +88,7 @@ public class TownlessHudEditorScreen extends Screen {
     public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
         if (dragging && event.button() == 0) {
             Font font = Minecraft.getInstance().font;
-            List<String> players = liveOrPlaceholder();
+            List<TownlessTracker.Entry> players = liveOrPlaceholder();
             int w = TownlessHud.hudWidth(font, players);
             int h = TownlessHud.hudHeight(font, players);
 
@@ -115,8 +122,8 @@ public class TownlessHudEditorScreen extends Screen {
         Minecraft.getInstance().setScreen(null);
     }
 
-    private List<String> liveOrPlaceholder() {
-        List<String> live = RecruitmentAddon.townlessTracker().getDisplayList();
-        return live.isEmpty() ? PLACEHOLDER : live;
+    private List<TownlessTracker.Entry> liveOrPlaceholder() {
+        List<TownlessTracker.Entry> live = RecruitmentAddon.townlessTracker().getDisplayList();
+        return live.isEmpty() ? placeholders() : live;
     }
 }

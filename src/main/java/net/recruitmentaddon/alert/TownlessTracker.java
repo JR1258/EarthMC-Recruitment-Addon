@@ -28,8 +28,11 @@ public final class TownlessTracker {
             Pattern.CASE_INSENSITIVE
     );
 
+    /** A confirmed new player shown in the townless HUD. */
+    public record Entry(String displayName, long registeredMs) {}
+
     private final Map<String, String> onlinePlayers = new ConcurrentHashMap<>();
-    private final LinkedHashMap<String, String> townlessVisible = new LinkedHashMap<>();
+    private final LinkedHashMap<String, Entry> townlessVisible = new LinkedHashMap<>();
     private final Set<String> invited = ConcurrentHashMap.newKeySet();
     private long graceUntil = 0L;
 
@@ -79,6 +82,14 @@ public final class TownlessTracker {
         if (m.find()) { onInvited(m.group(1)); }
     }
 
+    /** Called by JoinAlerter when it confirms a new player. Adds them to the HUD. */
+    public void addJoinAlertPlayer(String displayName, long registeredMs) {
+        if (displayName == null) return;
+        String k = displayName.toLowerCase(Locale.ROOT);
+        if (invited.contains(k)) return;
+        townlessVisible.put(k, new Entry(displayName, registeredMs));
+    }
+
     public void update(EarthMcData data, RecruitmentConfig config) {
         if (!config.townlessHudEnabled) {
             townlessVisible.clear();
@@ -88,43 +99,33 @@ public final class TownlessTracker {
         if (now < graceUntil) return;
         long maxAgeMs = parseAgeMs(config.townlessMaxAge);
 
-        // Re-filter existing visible entries when max-age setting changes
+        // Remove players whose accounts have aged past the configured window
         if (maxAgeMs > 0) {
             townlessVisible.entrySet().removeIf(e -> {
-                PlayerProfile p = data.profile(e.getKey());
-                return p != null && p.registeredMs() > 0 && now - p.registeredMs() > maxAgeMs;
+                long reg = e.getValue().registeredMs();
+                return reg > 0 && now - reg > maxAgeMs;
             });
         }
 
+        // Refresh visible players so we detect when they join a town
         List<String> toRequest = new ArrayList<>();
-        for (Map.Entry<String, String> e : onlinePlayers.entrySet()) {
-            if (invited.contains(e.getKey())) continue;
-            // Always request if profile is missing; also refresh visible players so we
-            // detect when they join a town (EarthMcData TTL limits actual API calls)
-            if (data.profile(e.getKey()) == null || townlessVisible.containsKey(e.getKey())) {
-                toRequest.add(e.getValue());
-            }
+        for (Entry e : townlessVisible.values()) {
+            toRequest.add(e.displayName());
         }
         if (!toRequest.isEmpty()) data.requestProfiles(toRequest);
 
-        for (Map.Entry<String, String> e : new ArrayList<>(onlinePlayers.entrySet())) {
-            String k = e.getKey();
-            if (townlessVisible.containsKey(k) || invited.contains(k)) continue;
-            PlayerProfile profile = data.profile(k);
-            if (profile == null) continue;
-            if (!profile.townless()) continue;
-            if (maxAgeMs > 0 && profile.registeredMs() > 0 && now - profile.registeredMs() > maxAgeMs) continue;
-            townlessVisible.put(k, e.getValue());
-        }
-
+        // Remove players that have since joined a town
         townlessVisible.entrySet().removeIf(e -> {
             PlayerProfile p = data.profile(e.getKey());
             return p != null && !p.townless();
         });
     }
 
-    public List<String> getDisplayList() {
-        return new ArrayList<>(townlessVisible.values());
+    /** Returns entries sorted newest-first (most recently registered account first). */
+    public List<Entry> getDisplayList() {
+        List<Entry> list = new ArrayList<>(townlessVisible.values());
+        list.sort(Comparator.comparingLong(Entry::registeredMs).reversed());
+        return list;
     }
 
     public static long parseAgeMs(String age) {
