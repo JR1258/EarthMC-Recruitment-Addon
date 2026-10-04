@@ -58,14 +58,14 @@ public class RecruitmentConfig {
      * the new player's name. The mod never sends this automatically.
      */
     public String recruitMessage =
-            "/msg {player} Hey {player}! Welcome to EarthMC — looking for a town? Message me!";
+            "/msg {player} Hey {player}! Welcome to EarthMC — looking for a town? [/t join {town}], for free gear, a plot and a welcoming community!";
 
     /** Plain phrase used to detect Towny success messages. */
     public String townJoinPhrase = "joined the town";
 
     /** Copy buttons shown after a Towny join-success message is detected. */
     public List<FollowUpMessage> followUpMessages = new ArrayList<>(List.of(
-            new FollowUpMessage("Welcome", "Welcome to the town, {player}!"),
+            new FollowUpMessage("Welcome", "/tc Welcome to the town, {player}! Please type /t spawn so I can help you get started!"),
             new FollowUpMessage("Rules", "/msg {player} Quick note: please read the town rules when you have a minute.")
     ));
 

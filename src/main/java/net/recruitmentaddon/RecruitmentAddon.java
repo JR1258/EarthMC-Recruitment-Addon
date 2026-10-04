@@ -34,6 +34,7 @@ public class RecruitmentAddon implements ClientModInitializer {
     private static GlobalAdReminder globalAdReminder;
     private static TownlessTracker townlessTracker;
     private static final Map<String, Long> followUpPromptedAt = new HashMap<>();
+    private static String selfTown = "";
 
     private long tickCounter = 0;
 
@@ -68,6 +69,7 @@ public class RecruitmentAddon implements ClientModInitializer {
             globalAdReminder.reset();
             townlessTracker.reset();
             followUpPromptedAt.clear();
+            selfTown = "";
             if (data != null) data.clear();
         });
     }
@@ -75,6 +77,7 @@ public class RecruitmentAddon implements ClientModInitializer {
     public static RecruitmentConfig config() { return config; }
     public static EarthMcData data() { return data; }
     public static TownlessTracker townlessTracker() { return townlessTracker; }
+    public static String selfTown() { return selfTown; }
 
     private void onClientTick(Minecraft client) {
         if (++tickCounter % POLL_INTERVAL_TICKS != 0) return;
@@ -82,6 +85,14 @@ public class RecruitmentAddon implements ClientModInitializer {
             if (!isActiveOnEarthMc(client)) return;
             joinAlerter.update(data, config);
             globalAdReminder.update(config);
+            if (client.player != null) {
+                String sn = client.player.getGameProfile().name();
+                if (sn != null && !sn.isBlank()) {
+                    data.requestProfiles(java.util.List.of(sn));
+                    net.recruitmentaddon.model.PlayerProfile sp = data.profile(sn);
+                    selfTown = (sp != null && sp.town() != null) ? sp.town() : "";
+                }
+            }
             if (client.getConnection() != null) {
                 Map<String, String> online = new HashMap<>();
                 for (PlayerInfo info : client.getConnection().getListedOnlinePlayers()) {

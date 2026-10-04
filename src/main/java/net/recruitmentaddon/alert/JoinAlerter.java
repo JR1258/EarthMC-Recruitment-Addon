@@ -118,7 +118,8 @@ public final class JoinAlerter {
             if (followUp == null || blank(followUp.title) || blank(followUp.message)) continue;
             if (!first) message = message.copy().append(Component.literal(" ").withStyle(ChatFormatting.GRAY));
             first = false;
-            String copied = followUp.message.replace("{player}", name);
+            String copied = followUp.message.replace("{player}", name)
+                    .replace("{town}", net.recruitmentaddon.RecruitmentAddon.selfTown());
             message = message.copy().append(Component.literal("[" + followUp.title + "]").withStyle(s -> s
                     .withColor(ChatFormatting.GREEN)
                     .withBold(true)
@@ -136,7 +137,8 @@ public final class JoinAlerter {
 
     private static void postSuggestPrompt(String name, RecruitmentConfig config, String reason, String button, String template) {
         Minecraft mc = Minecraft.getInstance();
-        String copied = template.replace("{player}", name);
+        String copied = template.replace("{player}", name)
+                .replace("{town}", net.recruitmentaddon.RecruitmentAddon.selfTown());
         Component message = Component.literal("[Recruitment] ").withStyle(ChatFormatting.AQUA)
                 .append(Component.literal(name).withStyle(ChatFormatting.YELLOW))
                 .append(Component.literal(" " + reason + " - ").withStyle(ChatFormatting.GRAY))
