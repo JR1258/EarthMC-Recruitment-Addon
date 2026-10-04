@@ -37,8 +37,7 @@ public abstract class ClientPlayNetworkHandlerMixin {
 
     @Inject(method = "handlePlayerChat", at = @At("HEAD"))
     private void recruitmentAddon$onPlayerChat(ClientboundPlayerChatPacket packet, CallbackInfo ci) {
-        if (packet.unsignedContent() != null) {
-            RecruitmentAddon.onIncomingMessage(packet.unsignedContent().getString(), false);
-        }
+        packet.unsignedContent().ifPresent(c ->
+                RecruitmentAddon.onIncomingMessage(c.getString(), false));
     }
 }
