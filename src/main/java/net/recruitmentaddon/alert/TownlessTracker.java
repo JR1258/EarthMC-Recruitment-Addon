@@ -86,19 +86,22 @@ public final class TownlessTracker {
         }
         long now = System.currentTimeMillis();
         if (now < graceUntil) return;
-        long minAgeMs = parseAgeMs(config.townlessMinAge);
+        long maxAgeMs = parseAgeMs(config.townlessMaxAge);
 
-        // Re-filter existing visible entries when min-age setting changes
-        if (minAgeMs > 0) {
+        // Re-filter existing visible entries when max-age setting changes
+        if (maxAgeMs > 0) {
             townlessVisible.entrySet().removeIf(e -> {
                 PlayerProfile p = data.profile(e.getKey());
-                return p != null && p.registeredMs() > 0 && now - p.registeredMs() < minAgeMs;
+                return p != null && p.registeredMs() > 0 && now - p.registeredMs() > maxAgeMs;
             });
         }
 
         List<String> toRequest = new ArrayList<>();
         for (Map.Entry<String, String> e : onlinePlayers.entrySet()) {
-            if (!invited.contains(e.getKey()) && data.profile(e.getKey()) == null) {
+            if (invited.contains(e.getKey())) continue;
+            // Always request if profile is missing; also refresh visible players so we
+            // detect when they join a town (EarthMcData TTL limits actual API calls)
+            if (data.profile(e.getKey()) == null || townlessVisible.containsKey(e.getKey())) {
                 toRequest.add(e.getValue());
             }
         }
@@ -110,7 +113,7 @@ public final class TownlessTracker {
             PlayerProfile profile = data.profile(k);
             if (profile == null) continue;
             if (!profile.townless()) continue;
-            if (minAgeMs > 0 && profile.registeredMs() > 0 && now - profile.registeredMs() < minAgeMs) continue;
+            if (maxAgeMs > 0 && profile.registeredMs() > 0 && now - profile.registeredMs() > maxAgeMs) continue;
             townlessVisible.put(k, e.getValue());
         }
 

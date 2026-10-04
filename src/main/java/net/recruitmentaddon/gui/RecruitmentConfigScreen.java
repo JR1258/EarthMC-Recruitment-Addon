@@ -96,8 +96,8 @@ public class RecruitmentConfigScreen extends Screen {
                 "Max players shown", v -> { c.townlessHudMaxPlayers = v; c.save(); }));
         y += 32;
         int fieldW = W - 112;
-        addTextField("Min account age (e.g. 1d, 12h, 30m, 90s)", c.townlessMinAge, x, y, fieldW, 16, s -> {
-            c.townlessMinAge = s.isBlank() ? "1d" : s.trim();
+        addTextField("Account created within (e.g. 7d, 24h, 12h)", c.townlessMaxAge, x, y, fieldW, 16, s -> {
+            c.townlessMaxAge = s.isBlank() ? "7d" : s.trim();
             c.save();
         });
         addRenderableWidget(Button.builder(Component.literal("Position HUD"), b ->

@@ -58,22 +58,26 @@ public class RecruitmentConfig {
      * the new player's name. The mod never sends this automatically.
      */
     public String recruitMessage =
-            "/msg {player} Hey {player}! Welcome to EarthMC — looking for a town? Message me!";
+            "/msg {player} Hey {player}! Welcome to EarthMC — looking for a town? [/t join {town}], for free gear, a plot and a welcoming community!";
 
     /** Plain phrase used to detect Towny success messages. */
     public String townJoinPhrase = "joined the town";
 
     /** Copy buttons shown after a Towny join-success message is detected. */
     public List<FollowUpMessage> followUpMessages = new ArrayList<>(List.of(
-            new FollowUpMessage("Welcome", "Welcome to the town, {player}!"),
+            new FollowUpMessage("Welcome", "/tc Welcome to the town, {player}! Please type /t spawn so I can help you get started!"),
             new FollowUpMessage("Rules", "/msg {player} Quick note: please read the town rules when you have a minute.")
     ));
 
     /** Shows a live list of townless (uninvited) players in the top-left corner. */
     public boolean townlessHudEnabled = false;
 
-    /** Minimum account age for a player to appear in the townless HUD (e.g. 1d, 12h, 30m). */
-    public String townlessMinAge = "1d";
+    /**
+     * Maximum account age for a player to appear in the townless HUD.
+     * Players are removed once their account is older than this value.
+     * Accepts a number followed by d (days), h (hours), m (minutes), or s (seconds).
+     */
+    public String townlessMaxAge = "7d";
 
     /** Maximum number of players to show in the townless HUD at once. */
     public int townlessHudMaxPlayers = 10;
@@ -122,11 +126,12 @@ public class RecruitmentConfig {
     }
 
     private void ensureDefaults() {
+        enabled = true;
         if (excludedPlayers == null) excludedPlayers = new ArrayList<>();
         if (followUpMessages == null) followUpMessages = new ArrayList<>();
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
-        if (townlessMinAge == null || townlessMinAge.isBlank()) townlessMinAge = "1d";
+        if (townlessMaxAge == null || townlessMaxAge.isBlank()) townlessMaxAge = "7d";
         if (townlessHudMaxPlayers < 1) townlessHudMaxPlayers = 10;
     }
 
