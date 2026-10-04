@@ -18,7 +18,7 @@ public final class RecruitCommand {
     private RecruitCommand() {}
 
     public static void register() {
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) ->
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> {
             dispatcher.register(ClientCommandManager.literal("recruit")
                 .executes(ctx -> openSettings(ctx.getSource()))
                 .then(ClientCommandManager.literal("on")
@@ -37,7 +37,10 @@ public final class RecruitCommand {
                         .executes(ctx -> townlessOpenEditor(ctx.getSource())))
                     .then(ClientCommandManager.literal("maxage")
                         .then(ClientCommandManager.argument("age", StringArgumentType.word())
-                            .executes(ctx -> townlessSetMaxAge(ctx.getSource(), StringArgumentType.getString(ctx, "age"))))))));
+                            .executes(ctx -> townlessSetMaxAge(ctx.getSource(), StringArgumentType.getString(ctx, "age")))))));
+            dispatcher.register(ClientCommandManager.literal("rnext")
+                .executes(ctx -> recruitNext(ctx.getSource())));
+        });
     }
 
     private static int setEnabled(FabricClientCommandSource source, boolean on) {
@@ -85,6 +88,22 @@ public final class RecruitCommand {
     private static int townlessOpenEditor(FabricClientCommandSource source) {
         MinecraftClient mc = MinecraftClient.getInstance();
         mc.execute(() -> mc.setScreen(new TownlessHudEditorScreen()));
+        return 1;
+    }
+
+    private static int recruitNext(FabricClientCommandSource source) {
+        net.recruitmentaddon.alert.TownlessTracker tracker = RecruitmentAddon.townlessTracker();
+        if (tracker == null) { feedback(source, "§cTownless tracker not available."); return 0; }
+        java.util.List<net.recruitmentaddon.alert.TownlessTracker.Entry> list = tracker.getDisplayList();
+        if (list.isEmpty()) { feedback(source, "No players in the townless HUD."); return 0; }
+        net.recruitmentaddon.alert.TownlessTracker.Entry entry = list.get(0);
+        String name = entry.displayName();
+        RecruitmentConfig c = RecruitmentAddon.config();
+        String message = c.recruitMessage
+                .replace("{player}", name)
+                .replace("{town}", RecruitmentAddon.selfTown());
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.execute(() -> mc.setScreen(new net.minecraft.client.gui.screen.ChatScreen(message, false)));
         return 1;
     }
 
