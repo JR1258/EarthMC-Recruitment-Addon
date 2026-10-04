@@ -33,7 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class EarthMcData {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("RecruitmentAddon");
-    private static final long PROFILE_TTL_MS = 60_000L;
+    private static final long PROFILE_TTL_MS      = 60_000L;
+    private static final long NULL_PROFILE_TTL_MS = 10_000L; // retry fast when API hasn't returned a profile yet
     private static final int MAX_QUERY_BATCH = 50;
 
     private final RecruitmentConfig config;
@@ -93,7 +94,10 @@ public final class EarthMcData {
         for (String name : names) {
             String k = key(name);
             Long at = profileFetchedAt.get(k);
-            if (!forceFresh && at != null && now - at < PROFILE_TTL_MS) continue;
+            if (!forceFresh && at != null) {
+                long ttl = profiles.containsKey(k) ? PROFILE_TTL_MS : NULL_PROFILE_TTL_MS;
+                if (now - at < ttl) continue;
+            }
             PlayerProfile bridged = townyMapBridge.cachedProfile(name);
             if (bridged != null) {
                 cacheProfile(bridged, now);
