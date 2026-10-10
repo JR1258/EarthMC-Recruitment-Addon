@@ -35,6 +35,8 @@ public final class TownlessTracker {
     private final Map<String, String> onlinePlayers = new ConcurrentHashMap<>();
     private final LinkedHashMap<String, Entry> townlessVisible = new LinkedHashMap<>();
     private final Set<String> invited = ConcurrentHashMap.newKeySet();
+    /** Invited players that survive reconnects — so dismissed players don't reappear after log-out/rejoin. */
+    private final Set<String> persistentInvited = ConcurrentHashMap.newKeySet();
     /** Players confirmed to have a town — skipped until they leave and rejoin. */
     private final Set<String> checkedTowned = ConcurrentHashMap.newKeySet();
     /** New arrivals awaiting a profile response; drained as results come back. */
@@ -46,6 +48,7 @@ public final class TownlessTracker {
         onlinePlayers.clear();
         townlessVisible.clear();
         invited.clear();
+        invited.addAll(persistentInvited); // restore dismissed players so they don't reappear on rejoin
         checkedTowned.clear();
         pendingLookup.clear();
         graceUntil = System.currentTimeMillis() + GRACE_MS;
@@ -73,6 +76,7 @@ public final class TownlessTracker {
         if (name == null) return;
         String k = name.toLowerCase(Locale.ROOT);
         invited.add(k);
+        persistentInvited.add(k);
         townlessVisible.remove(k);
     }
 
