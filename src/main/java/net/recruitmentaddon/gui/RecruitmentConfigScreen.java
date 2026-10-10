@@ -94,15 +94,13 @@ public class RecruitmentConfigScreen extends Screen {
         y += 24;
         addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 1, 20, c.townlessHudMaxPlayers,
                 "Max players shown", v -> { c.townlessHudMaxPlayers = v; c.save(); }));
-        y += 32;
-        int fieldW = W - 112;
-        addTextField("Account created within (e.g. 7d, 24h, 12h)", c.townlessMaxAge, x, y, fieldW, 16, s -> {
-            c.townlessMaxAge = s.isBlank() ? "7d" : s.trim();
-            c.save();
-        });
+        y += 24;
+        addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 0, 30, c.townlessMaxAgeDays,
+                "Max account age (days, 0=off)", v -> { c.townlessMaxAgeDays = v; c.save(); }));
+        y += 24;
         addRenderableWidget(Button.builder(Component.literal("Position HUD"), b ->
                 Minecraft.getInstance().gui.setScreen(new TownlessHudEditorScreen()))
-                .bounds(x + fieldW + 8, y + LABEL_GAP, 104, FIELD_H).build());
+                .bounds(x, y, W, FIELD_H).build());
     }
 
     private void initAds(RecruitmentConfig c, int x, int y) {

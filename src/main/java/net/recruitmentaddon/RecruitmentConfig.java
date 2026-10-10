@@ -72,12 +72,8 @@ public class RecruitmentConfig {
     /** Shows a live list of townless (uninvited) players in the top-left corner. */
     public boolean townlessHudEnabled = false;
 
-    /**
-     * Maximum account age for a player to appear in the townless HUD.
-     * Players are removed once their account is older than this value.
-     * Accepts a number followed by d (days), h (hours), m (minutes), or s (seconds).
-     */
-    public String townlessMaxAge = "7d";
+    /** Maximum account age in days for a player to appear in the townless HUD. 0 = no limit. */
+    public int townlessMaxAgeDays = 7;
 
     /** Maximum number of players to show in the townless HUD at once. */
     public int townlessHudMaxPlayers = 10;
@@ -131,7 +127,8 @@ public class RecruitmentConfig {
         if (followUpMessages == null) followUpMessages = new ArrayList<>();
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
-        if (townlessMaxAge == null || townlessMaxAge.isBlank()) townlessMaxAge = "7d";
+        if (newPlayerMaxSeconds < 1) newPlayerMaxSeconds = 90;
+        if (townlessMaxAgeDays < 0) townlessMaxAgeDays = 7;
         if (townlessHudMaxPlayers < 1) townlessHudMaxPlayers = 10;
     }
 

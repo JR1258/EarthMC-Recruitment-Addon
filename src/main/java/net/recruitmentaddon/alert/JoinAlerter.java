@@ -73,15 +73,15 @@ public final class JoinAlerter {
                 data.requestFreshProfile(join.name());
             }
             if (profile == null) return false;
-            if (profile.registeredWithinSeconds(config.newPlayerMaxSeconds)) {
-                long ageMs = System.currentTimeMillis() - profile.registeredMs();
-                long joinLagMs = join.seenAtMs() - profile.registeredMs();
-                if (ageMs >= 0 && joinLagMs >= 0 && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
-                    scheduleRecruitMessage(entry.getKey(), profile.name(), config, now);
-                    alertedAt.put(entry.getKey(), System.currentTimeMillis());
-                    TownlessTracker tracker = RecruitmentAddon.townlessTracker();
-                    if (tracker != null) tracker.addJoinAlertPlayer(profile.name(), profile.registeredMs());
-                }
+            // Compare when we SAW the player (seenAtMs) to their EarthMC registration,
+            // not the current time. Using now would silently drop alerts whenever the API
+            // responds slower than newPlayerMaxSeconds.
+            long joinLagMs = join.seenAtMs() - profile.registeredMs();
+            if (profile.registeredMs() > 0 && joinLagMs >= 0 && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
+                scheduleRecruitMessage(entry.getKey(), profile.name(), config, now);
+                alertedAt.put(entry.getKey(), System.currentTimeMillis());
+                TownlessTracker tracker = RecruitmentAddon.townlessTracker();
+                if (tracker != null) tracker.addJoinAlertPlayer(profile.name(), profile.registeredMs());
             }
             return true;
         });
