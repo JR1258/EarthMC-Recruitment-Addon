@@ -1,6 +1,6 @@
 package net.recruitmentaddon.command;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -36,8 +36,8 @@ public final class RecruitCommand {
                     .then(ClientCommands.literal("move")
                         .executes(ctx -> townlessOpenEditor(ctx.getSource())))
                     .then(ClientCommands.literal("maxage")
-                        .then(ClientCommands.argument("age", StringArgumentType.word())
-                            .executes(ctx -> townlessSetMaxAge(ctx.getSource(), StringArgumentType.getString(ctx, "age")))))));
+                        .then(ClientCommands.argument("days", IntegerArgumentType.integer(0, 30))
+                            .executes(ctx -> townlessSetMaxAge(ctx.getSource(), IntegerArgumentType.getInteger(ctx, "days")))))));
             dispatcher.register(ClientCommands.literal("rnext")
                 .executes(ctx -> recruitNext(ctx.getSource())));
         });
@@ -73,15 +73,11 @@ public final class RecruitCommand {
         return 1;
     }
 
-    private static int townlessSetMaxAge(FabricClientCommandSource source, String age) {
-        if (TownlessTracker.parseAgeMs(age) <= 0) {
-            feedback(source, "§cInvalid format. Use e.g. §f7d§c, §f24h§c, §f30m§c, §f90s§c.");
-            return 0;
-        }
+    private static int townlessSetMaxAge(FabricClientCommandSource source, int days) {
         RecruitmentConfig c = RecruitmentAddon.config();
-        c.townlessMaxAge = age;
+        c.townlessMaxAgeDays = days;
         c.save();
-        feedback(source, "Townless account window set to §f" + age + "§7.");
+        feedback(source, "Townless account age limit set to §f" + (days == 0 ? "off" : days + "d") + "§7.");
         return 1;
     }
 
