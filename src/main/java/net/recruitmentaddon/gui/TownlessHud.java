@@ -23,25 +23,38 @@ public final class TownlessHud {
         if (screen != null && !(screen instanceof net.minecraft.client.gui.screens.ChatScreen)) return;
         List<TownlessTracker.Entry> players = capped(RecruitmentAddon.townlessTracker().getDisplayList(), config.townlessHudMaxPlayers);
         if (players.isEmpty()) return;
-        renderAt(ctx, mc.font, players, config.townlessHudX, config.townlessHudY);
+        int sw = mc.getWindow().getGuiScaledWidth();
+        int sh = mc.getWindow().getGuiScaledHeight();
+        int hw = hudWidth(mc.font, players);
+        int hh = hudHeight(mc.font, players);
+        int dx = Math.min(Math.max(config.townlessHudX, 3), sw - hw + 3);
+        int dy = Math.min(Math.max(config.townlessHudY, 3), sh - hh + 3);
+        renderAt(ctx, mc.font, players, dx, dy);
     }
+
+    private static final int MAX_W = 160;
+    private static final int AGE_GAP = 4;
 
     static void renderAt(GuiGraphicsExtractor ctx, Font font, List<TownlessTracker.Entry> players, int x, int y) {
         long now = System.currentTimeMillis();
         int lh = font.lineHeight + 2;
         String header = "Townless (" + players.size() + ")";
-        int maxW = font.width(header);
+        int naturalW = font.width(header);
         for (TownlessTracker.Entry e : players) {
-            maxW = Math.max(maxW, font.width(e.displayName()) + font.width("  " + formatAge(now - e.registeredMs())));
+            String age = formatAge(now - e.registeredMs());
+            naturalW = Math.max(naturalW, font.width(e.displayName()) + AGE_GAP + font.width(age));
         }
-        ctx.fill(x - 3, y - 3, x + maxW + 3, y + lh * (players.size() + 1) + 3, 0x80000000);
+        int boxW = Math.min(naturalW, MAX_W);
+        ctx.fill(x - 3, y - 3, x + boxW + 3, y + lh * (players.size() + 1) + 3, 0x80000000);
         ctx.text(font, Component.literal(header), x, y, 0xFFAAAAAA);
         y += lh;
         for (TownlessTracker.Entry e : players) {
             long ageMs = now - e.registeredMs();
-            int nameW = font.width(e.displayName());
-            ctx.text(font, Component.literal(e.displayName()), x, y, 0xFFFFFFFF);
-            ctx.text(font, Component.literal("  " + formatAge(ageMs)), x + nameW, y, ageColor(ageMs));
+            String age = formatAge(ageMs);
+            int ageW = font.width(age);
+            String name = truncate(font, e.displayName(), boxW - AGE_GAP - ageW);
+            ctx.text(font, Component.literal(name), x, y, 0xFFFFFFFF);
+            ctx.text(font, Component.literal(age), x + boxW - ageW, y, ageColor(ageMs));
             y += lh;
         }
     }
@@ -49,11 +62,21 @@ public final class TownlessHud {
     static int hudWidth(Font font, List<TownlessTracker.Entry> players) {
         long now = System.currentTimeMillis();
         String header = "Townless (" + players.size() + ")";
-        int w = font.width(header);
+        int naturalW = font.width(header);
         for (TownlessTracker.Entry e : players) {
-            w = Math.max(w, font.width(e.displayName()) + font.width("  " + formatAge(now - e.registeredMs())));
+            String age = formatAge(now - e.registeredMs());
+            naturalW = Math.max(naturalW, font.width(e.displayName()) + AGE_GAP + font.width(age));
         }
-        return w + 6;
+        return Math.min(naturalW, MAX_W) + 6;
+    }
+
+    private static String truncate(Font font, String text, int maxWidth) {
+        if (font.width(text) <= maxWidth) return text;
+        String ellipsis = "…";
+        int ellipsisW = font.width(ellipsis);
+        while (!text.isEmpty() && font.width(text) + ellipsisW > maxWidth)
+            text = text.substring(0, text.length() - 1);
+        return text.isEmpty() ? ellipsis : text + ellipsis;
     }
 
     static int hudHeight(Font font, List<TownlessTracker.Entry> players) {
