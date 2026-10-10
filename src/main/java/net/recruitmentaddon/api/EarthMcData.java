@@ -16,12 +16,13 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Cached access to the official EarthMC API. Only used to look up a player's
@@ -44,7 +45,8 @@ public final class EarthMcData {
 
     private final Map<String, PlayerProfile> profiles = new ConcurrentHashMap<>();
     private final Map<String, Long> profileFetchedAt = new ConcurrentHashMap<>();
-    private final AtomicBoolean profileFetchRunning = new AtomicBoolean(false);
+    private static final int MAX_CONCURRENT_FETCHES = 3;
+    private final AtomicInteger activeFetches = new AtomicInteger(0);
 
     public EarthMcData(RecruitmentConfig config) {
         this.config = config;
@@ -87,10 +89,17 @@ public final class EarthMcData {
         requestProfiles(java.util.List.of(name), true);
     }
 
+    /** Clears the cached profile for {@code name} so the next batch request fetches it fresh. */
+    public void invalidateProfile(String name) {
+        String k = key(name);
+        profiles.remove(k);
+        profileFetchedAt.remove(k);
+    }
+
     private void requestProfiles(Collection<String> names, boolean forceFresh) {
         if (names.isEmpty()) return;
         long now = System.currentTimeMillis();
-        ArrayList<String> needed = new ArrayList<>();
+        ArrayList<String> allNeeded = new ArrayList<>();
         for (String name : names) {
             String k = key(name);
             Long at = profileFetchedAt.get(k);
@@ -103,35 +112,42 @@ public final class EarthMcData {
                 cacheProfile(bridged, now);
                 continue;
             }
-            needed.add(name);
-            if (needed.size() >= MAX_QUERY_BATCH) break;
+            allNeeded.add(name);
         }
-        if (needed.isEmpty()) return;
-        if (!profileFetchRunning.compareAndSet(false, true)) return;
-        executor.execute(() -> {
-            try {
-                JsonObject body = new JsonObject();
-                JsonArray query = new JsonArray();
-                needed.forEach(query::add);
-                body.add("query", query);
-                String json = post(config.earthmcApiBaseUrl + "/players", body.toString());
-                long fetchedAt = System.currentTimeMillis();
-                // Mark all requested as attempted (avoids re-querying unknown names every tick).
-                for (String name : needed) profileFetchedAt.put(key(name), fetchedAt);
-                if (json == null) return;
-                JsonElement root = JsonParser.parseString(json);
-                if (!root.isJsonArray()) return;
-                for (JsonElement el : root.getAsJsonArray()) {
-                    if (!el.isJsonObject()) continue;
-                    PlayerProfile profile = parseProfile(el.getAsJsonObject());
-                    if (profile != null) cacheProfile(profile, fetchedAt);
+        if (allNeeded.isEmpty()) return;
+        // Fire up to MAX_CONCURRENT_FETCHES batches in parallel. Pre-marking profileFetchedAt
+        // prevents duplicate batching on the next tick while requests are still in flight.
+        int offset = 0;
+        while (offset < allNeeded.size() && activeFetches.get() < MAX_CONCURRENT_FETCHES) {
+            int end = Math.min(offset + MAX_QUERY_BATCH, allNeeded.size());
+            List<String> batch = List.copyOf(allNeeded.subList(offset, end));
+            offset = end;
+            for (String name : batch) profileFetchedAt.put(key(name), now);
+            activeFetches.incrementAndGet();
+            executor.execute(() -> {
+                try {
+                    JsonObject body = new JsonObject();
+                    JsonArray query = new JsonArray();
+                    batch.forEach(query::add);
+                    body.add("query", query);
+                    String json = post(config.earthmcApiBaseUrl + "/players", body.toString());
+                    long fetchedAt = System.currentTimeMillis();
+                    for (String name : batch) profileFetchedAt.put(key(name), fetchedAt);
+                    if (json == null) return;
+                    JsonElement root = JsonParser.parseString(json);
+                    if (!root.isJsonArray()) return;
+                    for (JsonElement el : root.getAsJsonArray()) {
+                        if (!el.isJsonObject()) continue;
+                        PlayerProfile profile = parseProfile(el.getAsJsonObject());
+                        if (profile != null) cacheProfile(profile, fetchedAt);
+                    }
+                } catch (Exception e) {
+                    LOGGER.debug("[Recruitment] profile batch failed: {}", e.getMessage());
+                } finally {
+                    activeFetches.decrementAndGet();
                 }
-            } catch (Exception e) {
-                LOGGER.debug("[Recruitment] profile batch failed: {}", e.getMessage());
-            } finally {
-                profileFetchRunning.set(false);
-            }
-        });
+            });
+        }
     }
 
     private PlayerProfile parseProfile(JsonObject p) {

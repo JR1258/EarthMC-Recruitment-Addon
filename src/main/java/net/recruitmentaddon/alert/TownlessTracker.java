@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 public final class TownlessTracker {
 
     private static final long GRACE_MS = 8_000L;
+    private static final long RECHECK_TOWNED_MS = 300_000L; // re-classify towned players every 5 min
 
     private static final Pattern INVITED = Pattern.compile(
             "(?i)invited\\s+([A-Za-z0-9_]{3,16})\\b|\\b([A-Za-z0-9_]{3,16})\\s+has been sent a town invitation"
@@ -34,19 +35,38 @@ public final class TownlessTracker {
     private final Map<String, String> onlinePlayers = new ConcurrentHashMap<>();
     private final LinkedHashMap<String, Entry> townlessVisible = new LinkedHashMap<>();
     private final Set<String> invited = ConcurrentHashMap.newKeySet();
+    /** Players confirmed to have a town — skipped until they leave and rejoin. */
+    private final Set<String> checkedTowned = ConcurrentHashMap.newKeySet();
+    /** New arrivals awaiting a profile response; drained as results come back. */
+    private final Map<String, String> pendingLookup = new ConcurrentHashMap<>();
     private long graceUntil = 0L;
+    private long lastRecheckMs = 0L;
 
     public void reset() {
         onlinePlayers.clear();
         townlessVisible.clear();
         invited.clear();
+        checkedTowned.clear();
+        pendingLookup.clear();
         graceUntil = System.currentTimeMillis() + GRACE_MS;
     }
 
     public void syncOnlinePlayers(Map<String, String> lowercaseToDisplay) {
+        // Enqueue genuinely new arrivals; skip anyone already classified
+        for (Map.Entry<String, String> e : lowercaseToDisplay.entrySet()) {
+            String k = e.getKey();
+            if (!onlinePlayers.containsKey(k)
+                    && !checkedTowned.contains(k)
+                    && !townlessVisible.containsKey(k)
+                    && !invited.contains(k)) {
+                pendingLookup.put(k, e.getValue());
+            }
+        }
         onlinePlayers.keySet().retainAll(lowercaseToDisplay.keySet());
         onlinePlayers.putAll(lowercaseToDisplay);
         townlessVisible.keySet().retainAll(lowercaseToDisplay.keySet());
+        checkedTowned.retainAll(lowercaseToDisplay.keySet());
+        pendingLookup.keySet().retainAll(lowercaseToDisplay.keySet());
     }
 
     public void onInvited(String name) {
@@ -82,11 +102,13 @@ public final class TownlessTracker {
         if (m.find()) { onInvited(m.group(1)); }
     }
 
-    /** Called by JoinAlerter when it confirms a new player. Adds them to the HUD. */
+    /** Called by JoinAlerter when it confirms a new player. Authoritative — overrides any API-scan classification. */
     public void addJoinAlertPlayer(String displayName, long registeredMs) {
         if (displayName == null) return;
         String k = displayName.toLowerCase(Locale.ROOT);
         if (invited.contains(k)) return;
+        checkedTowned.remove(k);
+        pendingLookup.remove(k);
         townlessVisible.put(k, new Entry(displayName, registeredMs));
     }
 
@@ -97,7 +119,7 @@ public final class TownlessTracker {
         }
         long now = System.currentTimeMillis();
         if (now < graceUntil) return;
-        long maxAgeMs = parseAgeMs(config.townlessMaxAge);
+        long maxAgeMs = config.townlessMaxAgeDays > 0 ? (long) config.townlessMaxAgeDays * 86_400_000L : 0;
 
         // Remove players whose accounts have aged past the configured window
         if (maxAgeMs > 0) {
@@ -107,17 +129,41 @@ public final class TownlessTracker {
             });
         }
 
-        // Refresh visible players so we detect when they join a town
-        List<String> toRequest = new ArrayList<>();
-        for (Entry e : townlessVisible.values()) {
-            toRequest.add(e.displayName());
+        // Periodically re-classify towned players; they may have left their town since last check
+        if (now - lastRecheckMs >= RECHECK_TOWNED_MS) {
+            lastRecheckMs = now;
+            for (String k : new ArrayList<>(checkedTowned)) {
+                if (onlinePlayers.containsKey(k) && !invited.contains(k)) {
+                    checkedTowned.remove(k);
+                    data.invalidateProfile(k);
+                    pendingLookup.put(k, onlinePlayers.get(k));
+                }
+            }
         }
+
+        // Request profiles for pending arrivals + re-check visible players for town joins
+        List<String> toRequest = new ArrayList<>(pendingLookup.values());
+        for (Entry e : townlessVisible.values()) toRequest.add(e.displayName());
         if (!toRequest.isEmpty()) data.requestProfiles(toRequest);
 
-        // Remove players that have since joined a town
+        // Drain pending: classify players whose profiles have now arrived
+        pendingLookup.entrySet().removeIf(e -> {
+            PlayerProfile p = data.profile(e.getKey());
+            if (p == null) return false;
+            if (p.townless()) {
+                String display = p.name() != null ? p.name() : e.getValue();
+                townlessVisible.put(e.getKey(), new Entry(display, p.registeredMs()));
+            } else {
+                checkedTowned.add(e.getKey());
+            }
+            return true;
+        });
+
+        // Remove visible players that have since joined a town
         townlessVisible.entrySet().removeIf(e -> {
             PlayerProfile p = data.profile(e.getKey());
-            return p != null && !p.townless();
+            if (p != null && !p.townless()) { checkedTowned.add(e.getKey()); return true; }
+            return false;
         });
     }
 
@@ -128,17 +174,4 @@ public final class TownlessTracker {
         return list;
     }
 
-    public static long parseAgeMs(String age) {
-        if (age == null || age.isBlank()) return 86_400_000L;
-        String s = age.trim().toLowerCase(Locale.ROOT);
-        try {
-            if (s.endsWith("d")) return Long.parseLong(s.substring(0, s.length() - 1)) * 86_400_000L;
-            if (s.endsWith("h")) return Long.parseLong(s.substring(0, s.length() - 1)) * 3_600_000L;
-            if (s.endsWith("m")) return Long.parseLong(s.substring(0, s.length() - 1)) *     60_000L;
-            if (s.endsWith("s")) return Long.parseLong(s.substring(0, s.length() - 1)) *      1_000L;
-            return Long.parseLong(s) * 1_000L;
-        } catch (NumberFormatException ignored) {
-            return 86_400_000L;
-        }
-    }
 }
