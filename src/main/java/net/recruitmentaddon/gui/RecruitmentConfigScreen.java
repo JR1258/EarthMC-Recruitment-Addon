@@ -93,15 +93,13 @@ public class RecruitmentConfigScreen extends Screen {
         y += 24;
         addDrawableChild(new IntSlider(x, y, W, FIELD_H, 1, 20, c.townlessHudMaxPlayers,
                 "Max players shown", v -> { c.townlessHudMaxPlayers = v; c.save(); }));
-        y += 32;
-        int fieldW = W - 112;
-        addTextField("Account created within (e.g. 7d, 24h, 12h)", c.townlessMaxAge, x, y, fieldW, 16, s -> {
-            c.townlessMaxAge = s.isBlank() ? "7d" : s.trim();
-            c.save();
-        });
+        y += 24;
+        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 0, 30, c.townlessMaxAgeDays,
+                "Max account age (days, 0=off)", v -> { c.townlessMaxAgeDays = v; c.save(); }));
+        y += 24;
         addDrawableChild(ButtonWidget.builder(Text.literal("Position HUD"),
                 b -> this.client.setScreen(new TownlessHudEditorScreen()))
-                .dimensions(x + fieldW + 8, y + LABEL_GAP, 104, FIELD_H).build());
+                .dimensions(x, y, W, FIELD_H).build());
     }
 
     private void initAds(RecruitmentConfig c, int x, int y) {
