@@ -73,7 +73,7 @@ public class RecruitmentConfig {
     public boolean townlessHudEnabled = false;
 
     /** Maximum account age in days for a player to appear in the townless HUD. 0 = no limit. */
-    public int townlessMaxAgeDays = 7;
+    public int townlessMaxAgeDays = 0;
 
     /** Maximum number of players to show in the townless HUD at once. */
     public int townlessHudMaxPlayers = 10;
@@ -128,7 +128,7 @@ public class RecruitmentConfig {
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
         if (newPlayerMaxSeconds < 1) newPlayerMaxSeconds = 90;
-        if (townlessMaxAgeDays < 0) townlessMaxAgeDays = 7;
+        if (townlessMaxAgeDays < 0) townlessMaxAgeDays = 0;
         if (townlessHudMaxPlayers < 1) townlessHudMaxPlayers = 10;
     }
 
