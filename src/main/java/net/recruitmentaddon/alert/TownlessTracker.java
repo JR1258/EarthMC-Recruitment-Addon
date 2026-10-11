@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class TownlessTracker {
 
     private static final long GRACE_MS = 8_000L;
-    private static final long RECHECK_TOWNED_MS = 300_000L; // re-classify towned players every 5 min
+    private static final long RECHECK_TOWNED_MS = 90_000L; // re-classify towned players every 90 s
 
     private static final Pattern INVITED = Pattern.compile(
             "(?i)invited\\s+([A-Za-z0-9_]{3,16})\\b|\\b([A-Za-z0-9_]{3,16})\\s+has been sent a town invitation"
@@ -37,12 +37,11 @@ public final class TownlessTracker {
     private final Set<String> invited = ConcurrentHashMap.newKeySet();
     /** Invited players that survive reconnects — so dismissed players don't reappear after log-out/rejoin. */
     private final Set<String> persistentInvited = ConcurrentHashMap.newKeySet();
-    /** Players confirmed to have a town — skipped until they leave and rejoin. */
-    private final Set<String> checkedTowned = ConcurrentHashMap.newKeySet();
+    /** Players confirmed to have a town → time they were classified; re-queued after RECHECK_TOWNED_MS. */
+    private final Map<String, Long> checkedTowned = new ConcurrentHashMap<>();
     /** New arrivals awaiting a profile response; drained as results come back. */
     private final Map<String, String> pendingLookup = new ConcurrentHashMap<>();
     private long graceUntil = 0L;
-    private long lastRecheckMs = 0L;
 
     public void reset() {
         onlinePlayers.clear();
@@ -59,7 +58,7 @@ public final class TownlessTracker {
         for (Map.Entry<String, String> e : lowercaseToDisplay.entrySet()) {
             String k = e.getKey();
             if (!onlinePlayers.containsKey(k)
-                    && !checkedTowned.contains(k)
+                    && !checkedTowned.containsKey(k)
                     && !townlessVisible.containsKey(k)
                     && !invited.contains(k)) {
                 pendingLookup.put(k, e.getValue());
@@ -68,7 +67,7 @@ public final class TownlessTracker {
         onlinePlayers.keySet().retainAll(lowercaseToDisplay.keySet());
         onlinePlayers.putAll(lowercaseToDisplay);
         townlessVisible.keySet().retainAll(lowercaseToDisplay.keySet());
-        checkedTowned.retainAll(lowercaseToDisplay.keySet());
+        checkedTowned.keySet().retainAll(lowercaseToDisplay.keySet());
         pendingLookup.keySet().retainAll(lowercaseToDisplay.keySet());
     }
 
@@ -116,6 +115,7 @@ public final class TownlessTracker {
         townlessVisible.put(k, new Entry(displayName, registeredMs));
     }
 
+
     public void update(EarthMcData data, RecruitmentConfig config) {
         if (!config.townlessHudEnabled) {
             townlessVisible.clear();
@@ -133,17 +133,14 @@ public final class TownlessTracker {
             });
         }
 
-        // Periodically re-classify towned players; they may have left their town since last check
-        if (now - lastRecheckMs >= RECHECK_TOWNED_MS) {
-            lastRecheckMs = now;
-            for (String k : new ArrayList<>(checkedTowned)) {
-                if (onlinePlayers.containsKey(k) && !invited.contains(k)) {
-                    checkedTowned.remove(k);
-                    data.invalidateProfile(k);
-                    pendingLookup.put(k, onlinePlayers.get(k));
-                }
-            }
-        }
+        // Re-classify towned players individually once their re-check window expires
+        checkedTowned.entrySet().removeIf(e -> {
+            if (!onlinePlayers.containsKey(e.getKey()) || invited.contains(e.getKey())) return false;
+            if (now - e.getValue() < RECHECK_TOWNED_MS) return false;
+            data.invalidateProfile(e.getKey());
+            pendingLookup.put(e.getKey(), onlinePlayers.get(e.getKey()));
+            return true;
+        });
 
         // Request profiles for pending arrivals + re-check visible players for town joins
         List<String> toRequest = new ArrayList<>(pendingLookup.values());
@@ -158,7 +155,7 @@ public final class TownlessTracker {
                 String display = p.name() != null ? p.name() : e.getValue();
                 townlessVisible.put(e.getKey(), new Entry(display, p.registeredMs()));
             } else {
-                checkedTowned.add(e.getKey());
+                checkedTowned.put(e.getKey(), now);
             }
             return true;
         });
@@ -166,7 +163,7 @@ public final class TownlessTracker {
         // Remove visible players that have since joined a town
         townlessVisible.entrySet().removeIf(e -> {
             PlayerProfile p = data.profile(e.getKey());
-            if (p != null && !p.townless()) { checkedTowned.add(e.getKey()); return true; }
+            if (p != null && !p.townless()) { checkedTowned.put(e.getKey(), now); return true; }
             return false;
         });
     }
