@@ -94,11 +94,15 @@ public class RecruitmentAddon implements ClientModInitializer {
                 }
             }
             if (client.getConnection() != null) {
+                String self = client.player != null ? client.player.getGameProfile().name() : null;
                 Map<String, String> online = new HashMap<>();
                 for (PlayerInfo info : client.getConnection().getListedOnlinePlayers()) {
                     if (info.getProfile() == null) continue;
                     String n = info.getProfile().name();
-                    if (n != null && !n.isBlank()) online.put(n.toLowerCase(Locale.ROOT), n);
+                    if (n == null || n.isBlank()) continue;
+                    if (self != null && self.equalsIgnoreCase(n)) continue;
+                    if (isExcluded(n)) continue;
+                    online.put(n.toLowerCase(Locale.ROOT), n);
                 }
                 townlessTracker.syncOnlinePlayers(online);
             }
