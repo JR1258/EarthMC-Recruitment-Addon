@@ -45,7 +45,7 @@ public final class EarthMcData {
 
     private final Map<String, PlayerProfile> profiles = new ConcurrentHashMap<>();
     private final Map<String, Long> profileFetchedAt = new ConcurrentHashMap<>();
-    private static final int MAX_CONCURRENT_FETCHES = 3;
+    private static final int MAX_CONCURRENT_FETCHES = 5;
     private final AtomicInteger activeFetches = new AtomicInteger(0);
 
     public EarthMcData(RecruitmentConfig config) {
