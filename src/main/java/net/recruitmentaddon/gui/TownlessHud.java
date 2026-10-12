@@ -40,7 +40,7 @@ public final class TownlessHud {
         String header = "Townless (" + players.size() + ")";
         int naturalW = font.width(header);
         for (TownlessTracker.Entry e : players) {
-            String age = formatAge(now - e.registeredMs());
+            String age = e.registeredMs() > 0 ? formatAge(now - e.registeredMs()) : "?";
             naturalW = Math.max(naturalW, font.width(e.displayName()) + AGE_GAP + font.width(age));
         }
         int boxW = Math.min(naturalW, MAX_W);
@@ -48,8 +48,8 @@ public final class TownlessHud {
         ctx.text(font, Component.literal(header), x, y, 0xFFAAAAAA);
         y += lh;
         for (TownlessTracker.Entry e : players) {
-            long ageMs = now - e.registeredMs();
-            String age = formatAge(ageMs);
+            long ageMs = e.registeredMs() > 0 ? now - e.registeredMs() : 0;
+            String age = e.registeredMs() > 0 ? formatAge(ageMs) : "?";
             int ageW = font.width(age);
             String name = truncate(font, e.displayName(), boxW - AGE_GAP - ageW);
             ctx.text(font, Component.literal(name), x, y, 0xFFFFFFFF);
@@ -63,7 +63,7 @@ public final class TownlessHud {
         String header = "Townless (" + players.size() + ")";
         int naturalW = font.width(header);
         for (TownlessTracker.Entry e : players) {
-            String age = formatAge(now - e.registeredMs());
+            String age = e.registeredMs() > 0 ? formatAge(now - e.registeredMs()) : "?";
             naturalW = Math.max(naturalW, font.width(e.displayName()) + AGE_GAP + font.width(age));
         }
         return Math.min(naturalW, MAX_W) + 6;

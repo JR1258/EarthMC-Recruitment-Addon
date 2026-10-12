@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -45,6 +46,8 @@ public final class EarthMcData {
 
     private final Map<String, PlayerProfile> profiles = new ConcurrentHashMap<>();
     private final Map<String, Long> profileFetchedAt = new ConcurrentHashMap<>();
+    /** Keys whose next fetch must go to the EarthMC API, bypassing the Towny Map bridge. One-shot per key. */
+    private final Set<String> bridgeBypassKeys = ConcurrentHashMap.newKeySet();
     private static final int MAX_CONCURRENT_FETCHES = 5;
     private final AtomicInteger activeFetches = new AtomicInteger(0);
 
@@ -63,6 +66,7 @@ public final class EarthMcData {
         String k = key(name);
         PlayerProfile profile = profiles.get(k);
         if (profile != null) return profile;
+        if (bridgeBypassKeys.contains(k)) return null;
         PlayerProfile bridged = townyMapBridge.cachedProfile(name);
         if (bridged != null) {
             cacheProfile(bridged, System.currentTimeMillis());
@@ -74,6 +78,7 @@ public final class EarthMcData {
     public void clear() {
         profiles.clear();
         profileFetchedAt.clear();
+        bridgeBypassKeys.clear();
     }
 
     /** Fetches town/nation/registration for the given names that are missing or stale. */
@@ -86,6 +91,7 @@ public final class EarthMcData {
         String k = key(name);
         profiles.remove(k);
         profileFetchedAt.remove(k);
+        bridgeBypassKeys.add(k);
         requestProfiles(java.util.List.of(name), true);
     }
 
@@ -94,6 +100,7 @@ public final class EarthMcData {
         String k = key(name);
         profiles.remove(k);
         profileFetchedAt.remove(k);
+        bridgeBypassKeys.add(k);
     }
 
     private void requestProfiles(Collection<String> names, boolean forceFresh) {
@@ -107,7 +114,8 @@ public final class EarthMcData {
                 long ttl = profiles.containsKey(k) ? PROFILE_TTL_MS : NULL_PROFILE_TTL_MS;
                 if (now - at < ttl) continue;
             }
-            PlayerProfile bridged = townyMapBridge.cachedProfile(name);
+            boolean bypassBridge = bridgeBypassKeys.remove(k);
+            PlayerProfile bridged = bypassBridge ? null : townyMapBridge.cachedProfile(name);
             if (bridged != null) {
                 cacheProfile(bridged, now);
                 continue;
