@@ -30,6 +30,9 @@ public final class JoinAlerter {
     private static final long GRACE_MS = 8_000L;
     private static final long PENDING_TTL_MS = 120_000L;
     private static final long PENDING_REFRESH_MS = 3_000L;
+    // EarthMC writes the registration timestamp asynchronously, so it can land a few
+    // seconds AFTER the ADD_PLAYER packet reaches us — joinLagMs goes slightly negative.
+    private static final long ASYNC_REGISTRATION_TOLERANCE_MS = 30_000L;
 
     private final Map<String, PendingJoin> pending = new HashMap<>(); // lower-case key -> pending join
     private final Map<String, Long> alertedAt = new HashMap<>();      // lower-case keys -> last alert time
@@ -77,7 +80,7 @@ public final class JoinAlerter {
             // not the current time. Using now would silently drop alerts whenever the API
             // responds slower than newPlayerMaxSeconds.
             long joinLagMs = join.seenAtMs() - profile.registeredMs();
-            if (profile.registeredMs() > 0 && joinLagMs >= 0 && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
+            if (profile.registeredMs() > 0 && joinLagMs >= -ASYNC_REGISTRATION_TOLERANCE_MS && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
                 scheduleRecruitMessage(entry.getKey(), profile.name(), config, now);
                 alertedAt.put(entry.getKey(), System.currentTimeMillis());
                 TownlessTracker tracker = RecruitmentAddon.townlessTracker();
