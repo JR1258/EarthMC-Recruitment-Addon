@@ -1,5 +1,6 @@
 package net.recruitmentaddon.mixin;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.PlayerListEntry;
 import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
@@ -9,6 +10,7 @@ import net.minecraft.network.packet.s2c.play.ChatMessageS2CPacket;
 import net.recruitmentaddon.RecruitmentAddon;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,6 +27,7 @@ public abstract class ClientPlayNetworkHandlerMixin {
 
     @Inject(method = "onPlayerList", at = @At("HEAD"))
     private void recruitmentAddon$onPlayerList(PlayerListS2CPacket packet, CallbackInfo ci) {
+        if (offMainThread()) return;
         if (!packet.getActions().contains(PlayerListS2CPacket.Action.ADD_PLAYER)) return;
         for (PlayerListS2CPacket.Entry entry : packet.getEntries()) {
             if (entry.profile() == null || entry.profile().name() == null) continue;
@@ -35,6 +38,7 @@ public abstract class ClientPlayNetworkHandlerMixin {
 
     @Inject(method = "onGameMessage", at = @At("HEAD"))
     private void recruitmentAddon$onGameMessage(GameMessageS2CPacket packet, CallbackInfo ci) {
+        if (offMainThread()) return;
         if (!packet.overlay()) {
             RecruitmentAddon.onIncomingMessage(packet.content().getString(), true);
         }
@@ -42,13 +46,22 @@ public abstract class ClientPlayNetworkHandlerMixin {
 
     @Inject(method = "onProfilelessChatMessage", at = @At("HEAD"))
     private void recruitmentAddon$onProfilelessChatMessage(ProfilelessChatMessageS2CPacket packet, CallbackInfo ci) {
+        if (offMainThread()) return;
         RecruitmentAddon.onIncomingMessage(packet.message().getString(), true);
     }
 
     @Inject(method = "onChatMessage", at = @At("HEAD"))
     private void recruitmentAddon$onChatMessage(ChatMessageS2CPacket packet, CallbackInfo ci) {
+        if (offMainThread()) return;
         if (packet.unsignedContent() != null) {
             RecruitmentAddon.onIncomingMessage(packet.unsignedContent().getString(), false);
         }
+    }
+
+    // Vanilla re-runs these handlers on the main thread after an initial call on the
+    // network thread; acting on both passes races the mod's non-thread-safe state.
+    @Unique
+    private static boolean offMainThread() {
+        return !MinecraftClient.getInstance().isOnThread();
     }
 }
