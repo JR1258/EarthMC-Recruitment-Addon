@@ -162,6 +162,15 @@ public class RecruitmentAddon implements ClientModInitializer {
                 && server.address.toLowerCase(Locale.ROOT).contains("earthmc.net");
     }
 
+    public static boolean isListedOnline(String name) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (name == null || client.getNetworkHandler() == null) return false;
+        for (PlayerListEntry info : client.getNetworkHandler().getPlayerList()) {
+            if (info.getProfile() != null && name.equalsIgnoreCase(info.getProfile().name())) return true;
+        }
+        return false;
+    }
+
     public static boolean isExcluded(String name) {
         for (String excluded : config.excludedPlayers) {
             if (excluded.equalsIgnoreCase(name)) return true;

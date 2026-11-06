@@ -30,6 +30,8 @@ public final class JoinAlerter {
     private static final long GRACE_MS = 8_000L;
     private static final long PENDING_TTL_MS = 120_000L;
     private static final long PENDING_REFRESH_MS = 3_000L;
+    /** How long a just-added tab entry may stay unlisted before we treat the player as gone. */
+    private static final long LIST_SETTLE_MS = 3_000L;
     // EarthMC writes the registration timestamp asynchronously, so it can land a few
     // seconds AFTER the ADD_PLAYER packet reaches us — joinLagMs goes slightly negative.
     private static final long ASYNC_REGISTRATION_TOLERANCE_MS = 30_000L;
@@ -53,7 +55,7 @@ public final class JoinAlerter {
         if (now < graceUntil) return;
         String k = key(name);
         if (onCooldown(k, now, config) || pending.containsKey(k)) return;
-        pending.put(k, new PendingJoin(name, now, 0L));
+        pending.put(k, new PendingJoin(name, now, now));
         data.requestFreshProfile(name);
     }
 
@@ -70,6 +72,9 @@ public final class JoinAlerter {
         pending.entrySet().removeIf(entry -> {
             PendingJoin join = entry.getValue();
             if (now - join.seenAtMs() > PENDING_TTL_MS) return true;
+            if (!RecruitmentAddon.isListedOnline(join.name())) {
+                return now - join.seenAtMs() > LIST_SETTLE_MS;
+            }
             PlayerProfile profile = data.profile(join.name());
             if (profile == null && now - join.lastRefreshMs() >= PENDING_REFRESH_MS) {
                 join.lastRefreshMs(now);
@@ -107,7 +112,9 @@ public final class JoinAlerter {
         if (scheduled.isEmpty()) return;
         scheduled.entrySet().removeIf(entry -> {
             if (now < entry.getValue().dueAtMs()) return false;
-            postRecruitMessage(entry.getValue().name(), config);
+            if (RecruitmentAddon.isListedOnline(entry.getValue().name())) {
+                postRecruitMessage(entry.getValue().name(), config);
+            }
             return true;
         });
     }
