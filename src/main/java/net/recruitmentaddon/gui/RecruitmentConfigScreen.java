@@ -98,6 +98,13 @@ public class RecruitmentConfigScreen extends Screen {
         addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 0, 30, c.townlessMaxAgeDays,
                 "Max account age (days, 0=off)", v -> { c.townlessMaxAgeDays = v; c.save(); }));
         y += 24;
+        addRenderableWidget(CycleButton.onOffBuilder(c.returningTownlessAlerts)
+                .create(x, y, W, FIELD_H, Component.literal("Alert returning townless players"),
+                        (b, v) -> { c.returningTownlessAlerts = v; c.save(); }));
+        y += 24;
+        addRenderableWidget(new IntSlider(x, y, W, FIELD_H, 1, 60, c.returningTownlessMaxDays,
+                "Returning alert max account age (days)", v -> { c.returningTownlessMaxDays = v; c.save(); }));
+        y += 24;
         addRenderableWidget(Button.builder(Component.literal("Position HUD"), b ->
                 Minecraft.getInstance().gui.setScreen(new TownlessHudEditorScreen()))
                 .bounds(x, y, W, FIELD_H).build());

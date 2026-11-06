@@ -12,9 +12,11 @@ import net.recruitmentaddon.RecruitmentConfig;
 import net.recruitmentaddon.api.EarthMcData;
 import net.recruitmentaddon.model.PlayerProfile;
 
-import java.util.Locale;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Consumes server player-list ADD_PLAYER packets. When the official API confirms the
@@ -23,6 +25,9 @@ import java.util.Map;
  *
  * The player list populates incrementally right after you connect, so everyone seen in
  * the first few seconds is taken as the baseline — you're only pinged for genuine joins.
+ *
+ * Townless players whose account is still recent (see {@code returningTownlessMaxDays})
+ * are alerted too when they come back online, once per game session.
  */
 public final class JoinAlerter {
 
@@ -35,10 +40,13 @@ public final class JoinAlerter {
     // EarthMC writes the registration timestamp asynchronously, so it can land a few
     // seconds AFTER the ADD_PLAYER packet reaches us — joinLagMs goes slightly negative.
     private static final long ASYNC_REGISTRATION_TOLERANCE_MS = 30_000L;
+    private static final String NEW_PLAYER_REASON = "just joined as a new player";
 
     private final Map<String, PendingJoin> pending = new HashMap<>(); // lower-case key -> pending join
     private final Map<String, Long> alertedAt = new HashMap<>();      // lower-case keys -> last alert time
     private final Map<String, ScheduledAlert> scheduled = new HashMap<>();
+    /** Returning townless players already alerted this game session; survives reconnects. */
+    private final Set<String> returningAlerted = new HashSet<>();
     private long graceUntil = 0L;
 
     public void reset() {
@@ -85,9 +93,17 @@ public final class JoinAlerter {
             // not the current time. Using now would silently drop alerts whenever the API
             // responds slower than newPlayerMaxSeconds.
             long joinLagMs = join.seenAtMs() - profile.registeredMs();
-            if (profile.registeredMs() > 0 && joinLagMs >= -ASYNC_REGISTRATION_TOLERANCE_MS && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
-                scheduleRecruitMessage(entry.getKey(), profile.name(), config, now);
-                alertedAt.put(entry.getKey(), System.currentTimeMillis());
+            if (profile.registeredMs() <= 0) return true;
+            String reason = null;
+            if (joinLagMs >= -ASYNC_REGISTRATION_TOLERANCE_MS && joinLagMs <= config.newPlayerMaxSeconds * 1_000L) {
+                reason = NEW_PLAYER_REASON;
+            } else if (isReturningTownless(entry.getKey(), profile, config, join.seenAtMs())
+                    && returningAlerted.add(entry.getKey())) {
+                reason = "came online without a town (account " + formatAge(joinLagMs) + " old)";
+            }
+            if (reason != null) {
+                scheduleRecruitMessage(entry.getKey(), profile.name(), reason, config, now);
+                alertedAt.put(entry.getKey(), now);
                 TownlessTracker tracker = RecruitmentAddon.townlessTracker();
                 if (tracker != null) tracker.addJoinAlertPlayer(profile.name(), profile.registeredMs());
             }
@@ -97,15 +113,35 @@ public final class JoinAlerter {
 
     /** Posts the clickable recruit line for {@code name}. Shared by the alerter and {@code /recruit test}. */
     public static void postRecruitMessage(String name, RecruitmentConfig config) {
-        postSuggestPrompt(name, config, "just joined as a new player", "Suggest recruit message", config.recruitMessage);
+        postRecruitMessage(name, NEW_PLAYER_REASON, config);
     }
 
-    private void scheduleRecruitMessage(String key, String name, RecruitmentConfig config, long now) {
+    private static void postRecruitMessage(String name, String reason, RecruitmentConfig config) {
+        postSuggestPrompt(name, config, reason, "Suggest recruit message", config.recruitMessage);
+    }
+
+    /** A townless player with a recent account who isn't brand-new (e.g. logging back in a day later). */
+    private static boolean isReturningTownless(String key, PlayerProfile profile, RecruitmentConfig config, long seenAtMs) {
+        if (!config.returningTownlessAlerts || !profile.townless()) return false;
+        if (seenAtMs - profile.registeredMs() > config.returningTownlessMaxDays * 86_400_000L) return false;
+        TownlessTracker tracker = RecruitmentAddon.townlessTracker();
+        return tracker == null || !tracker.isInvited(key);
+    }
+
+    private static String formatAge(long ms) {
+        long minutes = Math.max(0L, ms) / 60_000L;
+        if (minutes < 60) return minutes + "m";
+        long hours = minutes / 60;
+        if (hours < 48) return hours + "h";
+        return (hours / 24) + "d";
+    }
+
+    private void scheduleRecruitMessage(String key, String name, String reason, RecruitmentConfig config, long now) {
         if (config.alertDelaySeconds <= 0) {
-            postRecruitMessage(name, config);
+            postRecruitMessage(name, reason, config);
             return;
         }
-        scheduled.put(key, new ScheduledAlert(name, now + config.alertDelaySeconds * 1_000L));
+        scheduled.put(key, new ScheduledAlert(name, reason, now + config.alertDelaySeconds * 1_000L));
     }
 
     private void postDueAlerts(RecruitmentConfig config, long now) {
@@ -113,7 +149,7 @@ public final class JoinAlerter {
         scheduled.entrySet().removeIf(entry -> {
             if (now < entry.getValue().dueAtMs()) return false;
             if (RecruitmentAddon.isListedOnline(entry.getValue().name())) {
-                postRecruitMessage(entry.getValue().name(), config);
+                postRecruitMessage(entry.getValue().name(), entry.getValue().reason(), config);
             }
             return true;
         });
@@ -203,5 +239,5 @@ public final class JoinAlerter {
         private void lastRefreshMs(long value) { this.lastRefreshMs = value; }
     }
 
-    private record ScheduledAlert(String name, long dueAtMs) {}
+    private record ScheduledAlert(String name, String reason, long dueAtMs) {}
 }
