@@ -97,6 +97,13 @@ public class RecruitmentConfigScreen extends Screen {
         addDrawableChild(new IntSlider(x, y, W, FIELD_H, 0, 30, c.townlessMaxAgeDays,
                 "Max account age (days, 0=off)", v -> { c.townlessMaxAgeDays = v; c.save(); }));
         y += 24;
+        addDrawableChild(CyclingButtonWidget.onOffBuilder(c.returningTownlessAlerts)
+                .build(x, y, W, FIELD_H, Text.literal("Alert returning townless players"),
+                        (b, v) -> { c.returningTownlessAlerts = v; c.save(); }));
+        y += 24;
+        addDrawableChild(new IntSlider(x, y, W, FIELD_H, 1, 60, c.returningTownlessMaxDays,
+                "Returning alert max account age (days)", v -> { c.returningTownlessMaxDays = v; c.save(); }));
+        y += 24;
         addDrawableChild(ButtonWidget.builder(Text.literal("Position HUD"),
                 b -> this.client.setScreen(new TownlessHudEditorScreen()))
                 .dimensions(x, y, W, FIELD_H).build());
