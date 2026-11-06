@@ -126,7 +126,8 @@ public final class EarthMcData {
         // Fire up to MAX_CONCURRENT_FETCHES batches in parallel. Pre-marking profileFetchedAt
         // prevents duplicate batching on the next tick while requests are still in flight.
         int offset = 0;
-        while (offset < allNeeded.size() && activeFetches.get() < MAX_CONCURRENT_FETCHES) {
+        // Fresh single-player lookups (new joins) skip the cap so bulk HUD batches can't delay them.
+        while (offset < allNeeded.size() && (forceFresh || activeFetches.get() < MAX_CONCURRENT_FETCHES)) {
             int end = Math.min(offset + MAX_QUERY_BATCH, allNeeded.size());
             List<String> batch = List.copyOf(allNeeded.subList(offset, end));
             offset = end;
