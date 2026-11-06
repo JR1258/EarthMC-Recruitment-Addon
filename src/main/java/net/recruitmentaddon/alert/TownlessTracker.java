@@ -79,6 +79,10 @@ public final class TownlessTracker {
         townlessVisible.remove(k);
     }
 
+    public boolean isInvited(String name) {
+        return name != null && invited.contains(name.toLowerCase(Locale.ROOT));
+    }
+
     public void onMessage(String message) {
         if (message == null) return;
         Matcher m = INVITED.matcher(message);

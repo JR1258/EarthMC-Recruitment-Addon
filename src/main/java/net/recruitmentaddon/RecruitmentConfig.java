@@ -37,6 +37,16 @@ public class RecruitmentConfig {
     /** Delays the recruit copy prompt after a new-player join is confirmed. */
     public int alertDelaySeconds = 0;
 
+    /**
+     * Also alerts when a townless player whose account is younger than
+     * {@link #returningTownlessMaxDays} comes back online (once per game session),
+     * not only for brand-new accounts.
+     */
+    public boolean returningTownlessAlerts = true;
+
+    /** Maximum account age in days for a returning townless player to trigger an alert. */
+    public int returningTownlessMaxDays = 14;
+
     /** Plays a short UI sound when a recruit or follow-up prompt is posted. */
     public boolean soundEnabled = true;
 
@@ -128,6 +138,7 @@ public class RecruitmentConfig {
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
         if (newPlayerMaxSeconds < 1) newPlayerMaxSeconds = 90;
+        if (returningTownlessMaxDays < 1) returningTownlessMaxDays = 14;
         if (townlessMaxAgeDays < 0) townlessMaxAgeDays = 0;
         if (townlessHudMaxPlayers < 1) townlessHudMaxPlayers = 10;
     }
