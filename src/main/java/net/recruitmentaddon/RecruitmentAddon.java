@@ -85,11 +85,6 @@ public class RecruitmentAddon implements ClientModInitializer {
         try {
             if (!isActiveOnEarthMc(client)) return;
             data.tick();
-            if (data.consumeAuthRejected()) {
-                JoinAlerter.postNotice(config.apiKey == null || config.apiKey.isBlank()
-                        ? "The EarthMC API now needs a key, so alerts are paused. Run /api key create, then /recruit apikey <key>."
-                        : "The EarthMC API rejected your API key. Create a new one with /api key create, then /recruit apikey <key>.");
-            }
             joinAlerter.update(data, config);
             globalAdReminder.update(config);
             if (client.player != null) {
