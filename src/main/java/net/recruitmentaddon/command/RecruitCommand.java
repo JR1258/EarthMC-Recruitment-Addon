@@ -1,6 +1,7 @@
 package net.recruitmentaddon.command;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -28,6 +29,12 @@ public final class RecruitCommand {
                     .executes(ctx -> setEnabled(ctx.getSource(), false)))
                 .then(ClientCommands.literal("settings")
                     .executes(ctx -> openSettings(ctx.getSource())))
+                .then(ClientCommands.literal("apikey")
+                    .executes(ctx -> apiKeyStatus(ctx.getSource()))
+                    .then(ClientCommands.literal("clear")
+                        .executes(ctx -> setApiKey(ctx.getSource(), "")))
+                    .then(ClientCommands.argument("key", StringArgumentType.greedyString())
+                        .executes(ctx -> setApiKey(ctx.getSource(), StringArgumentType.getString(ctx, "key")))))
                 .then(ClientCommands.literal("townless")
                     .executes(ctx -> townlessToggle(ctx.getSource()))
                     .then(ClientCommands.literal("on")
@@ -50,6 +57,29 @@ public final class RecruitCommand {
         c.save();
         feedback(source, "Join alerts " + (on ? "§aenabled" : "§cdisabled") + "§7.");
         return 1;
+    }
+
+    private static int apiKeyStatus(FabricClientCommandSource source) {
+        String key = RecruitmentAddon.config().apiKey;
+        if (key == null || key.isBlank()) {
+            feedback(source, "No EarthMC API key set. Create one with §f/api key create§7, then §f/recruit apikey <key>§7.");
+        } else {
+            feedback(source, "EarthMC API key set (" + maskKey(key) + "). §f/recruit apikey clear§7 removes it.");
+        }
+        return 1;
+    }
+
+    private static int setApiKey(FabricClientCommandSource source, String key) {
+        RecruitmentConfig c = RecruitmentAddon.config();
+        c.apiKey = key == null ? "" : key.trim();
+        c.save();
+        feedback(source, c.apiKey.isEmpty() ? "EarthMC API key cleared." : "EarthMC API key saved (" + maskKey(c.apiKey) + ").");
+        return 1;
+    }
+
+    /** Shows only the last 4 characters so the key never appears in full in chat or screenshots. */
+    private static String maskKey(String key) {
+        return key.length() <= 4 ? "****" : "…" + key.substring(key.length() - 4);
     }
 
     private static int openSettings(FabricClientCommandSource source) {

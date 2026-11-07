@@ -22,7 +22,7 @@ public abstract class ClientPlayNetworkHandlerMixin {
         if (!packet.actions().contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) return;
         for (ClientboundPlayerInfoUpdatePacket.Entry entry : packet.newEntries()) {
             if (entry.profile() == null || entry.profile().name() == null) continue;
-            RecruitmentAddon.onPlayerListAddPacket(entry.profile().name());
+            RecruitmentAddon.onPlayerListAddPacket(entry.profile().name(), entry.profileId());
         }
     }
 

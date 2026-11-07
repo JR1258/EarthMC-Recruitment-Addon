@@ -35,6 +35,8 @@ public final class JoinAlerter {
     private static final long GRACE_MS = 8_000L;
     private static final long PENDING_TTL_MS = 120_000L;
     private static final long PENDING_REFRESH_MS = 3_000L;
+    /** Players the API keeps answering without (opted out) are dropped after this long, not PENDING_TTL_MS. */
+    private static final long ABSENT_GIVE_UP_MS = 15_000L;
     /** How long a just-added tab entry may stay unlisted before we treat the player as gone. */
     private static final long LIST_SETTLE_MS = 3_000L;
     // EarthMC writes the registration timestamp asynchronously, so it can land a few
@@ -84,11 +86,16 @@ public final class JoinAlerter {
                 return now - join.seenAtMs() > LIST_SETTLE_MS;
             }
             PlayerProfile profile = data.profile(join.name());
-            if (profile == null && now - join.lastRefreshMs() >= PENDING_REFRESH_MS) {
-                join.lastRefreshMs(now);
-                data.requestFreshProfile(join.name());
+            if (profile == null) {
+                // A brand-new account can briefly be missing, so retry a few times before
+                // concluding the player has opted out of the API.
+                if (data.isAbsent(join.name()) && now - join.seenAtMs() > ABSENT_GIVE_UP_MS) return true;
+                if (now - join.lastRefreshMs() >= PENDING_REFRESH_MS) {
+                    join.lastRefreshMs(now);
+                    data.requestFreshProfile(join.name());
+                }
+                return false;
             }
-            if (profile == null) return false;
             // Compare when we SAW the player (seenAtMs) to their EarthMC registration,
             // not the current time. Using now would silently drop alerts whenever the API
             // responds slower than newPlayerMaxSeconds.
@@ -153,6 +160,14 @@ public final class JoinAlerter {
             }
             return true;
         });
+    }
+
+    /** Posts a plain informational line to the local chat. */
+    public static void postNotice(String text) {
+        Minecraft mc = Minecraft.getInstance();
+        Component message = Component.literal("[Recruitment] ").withStyle(ChatFormatting.AQUA)
+                .append(Component.literal(text).withStyle(ChatFormatting.GRAY));
+        mc.execute(() -> { if (mc.player != null) mc.player.sendSystemMessage(message); });
     }
 
     public static void postFollowUpMessages(String name, RecruitmentConfig config) {

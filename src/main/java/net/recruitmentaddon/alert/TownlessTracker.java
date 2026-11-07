@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 public final class TownlessTracker {
 
     private static final long GRACE_MS = 8_000L;
-    private static final long RECHECK_TOWNED_MS = 90_000L; // re-classify towned players every 90 s
+    private static final long RECHECK_TOWNED_MS = 90_000L; // re-classify towned players every 90 s, in one sweep
 
     private static final Pattern INVITED = Pattern.compile(
             "(?i)invited\\s+([A-Za-z0-9_]{3,16})\\b|\\b([A-Za-z0-9_]{3,16})\\s+has been sent a town invitation"
@@ -42,6 +42,7 @@ public final class TownlessTracker {
     /** New arrivals awaiting a profile response; drained as results come back. */
     private final Map<String, String> pendingLookup = new ConcurrentHashMap<>();
     private long graceUntil = 0L;
+    private long lastTownedSweepMs = 0L;
 
     public void reset() {
         onlinePlayers.clear();
@@ -51,6 +52,7 @@ public final class TownlessTracker {
         checkedTowned.clear();
         pendingLookup.clear();
         graceUntil = System.currentTimeMillis() + GRACE_MS;
+        lastTownedSweepMs = graceUntil;
     }
 
     public void syncOnlinePlayers(Map<String, String> lowercaseToDisplay) {
@@ -137,14 +139,17 @@ public final class TownlessTracker {
             });
         }
 
-        // Re-classify towned players individually once their re-check window expires
-        checkedTowned.entrySet().removeIf(e -> {
-            if (!onlinePlayers.containsKey(e.getKey()) || invited.contains(e.getKey())) return false;
-            if (now - e.getValue() < RECHECK_TOWNED_MS) return false;
-            data.invalidateProfile(e.getKey());
-            pendingLookup.put(e.getKey(), onlinePlayers.get(e.getKey()));
-            return true;
-        });
+        // Re-classify all towned players together so they go out as a few 100-player batches,
+        // rather than a trickle of small requests as each one's window expires.
+        if (now - lastTownedSweepMs >= RECHECK_TOWNED_MS) {
+            lastTownedSweepMs = now;
+            checkedTowned.entrySet().removeIf(e -> {
+                if (!onlinePlayers.containsKey(e.getKey()) || invited.contains(e.getKey())) return false;
+                data.invalidateProfile(e.getKey());
+                pendingLookup.put(e.getKey(), onlinePlayers.get(e.getKey()));
+                return true;
+            });
+        }
 
         // Request profiles for pending arrivals + re-check visible players for town joins
         List<String> toRequest = new ArrayList<>(pendingLookup.values());
@@ -154,7 +159,8 @@ public final class TownlessTracker {
         // Drain pending: classify players whose profiles have now arrived
         pendingLookup.entrySet().removeIf(e -> {
             PlayerProfile p = data.profile(e.getKey());
-            if (p == null) return false;
+            // Opted out of the API: nothing to classify, stop asking.
+            if (p == null) return data.isAbsent(e.getKey());
             if (p.townless()) {
                 String display = p.name() != null ? p.name() : e.getValue();
                 townlessVisible.put(e.getKey(), new Entry(display, p.registeredMs()));
