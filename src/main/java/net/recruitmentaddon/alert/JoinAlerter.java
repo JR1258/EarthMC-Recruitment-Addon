@@ -162,14 +162,6 @@ public final class JoinAlerter {
         });
     }
 
-    /** Posts a plain informational line to the local chat. */
-    public static void postNotice(String text) {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        Text message = Text.literal("[Recruitment] ").formatted(Formatting.AQUA)
-                .append(Text.literal(text).formatted(Formatting.GRAY));
-        mc.execute(() -> { if (mc.player != null) mc.player.sendMessage(message, false); });
-    }
-
     public static void postFollowUpMessages(String name, RecruitmentConfig config) {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (config.followUpMessages == null || config.followUpMessages.isEmpty()) return;

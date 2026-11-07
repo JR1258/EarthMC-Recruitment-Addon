@@ -30,7 +30,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -64,8 +63,6 @@ public final class EarthMcData {
     private static final int PRIORITY_BUDGET_PER_MIN = 160;
     private static final long MIN_BACKOFF_MS = 5_000L;
     private static final long MAX_BACKOFF_MS = 120_000L;
-    private static final long AUTH_BACKOFF_MS = 60_000L;
-    private static final long AUTH_WARNING_INTERVAL_MS = 10 * 60_000L;
     private static final String[] PLAYER_FIELDS = {"name", "uuid", "town", "nation", "timestamps"};
 
     private final RecruitmentConfig config;
@@ -88,8 +85,6 @@ public final class EarthMcData {
     private int activeFetches = 0;
     private long backoffUntil = 0L;
     private long backoffMs = 0L;
-    private long lastAuthWarningMs = 0L;
-    private final AtomicBoolean authRejected = new AtomicBoolean(false);
 
     public EarthMcData(RecruitmentConfig config) {
         this.config = config;
@@ -125,11 +120,6 @@ public final class EarthMcData {
     public void rememberUuid(String name, UUID id) {
         if (name == null || id == null) return;
         uuids.put(key(name), id);
-    }
-
-    /** True once after the API rejected our requests for a missing or invalid API key. */
-    public boolean consumeAuthRejected() {
-        return authRejected.getAndSet(false);
     }
 
     public void clear() {
@@ -254,8 +244,6 @@ public final class EarthMcData {
             JsonObject template = new JsonObject();
             for (String field : PLAYER_FIELDS) template.addProperty(field, true);
             body.add("template", template);
-            String apiKey = config.apiKey;
-            if (apiKey != null && !apiKey.isBlank()) body.addProperty("key", apiKey.trim());
 
             Response resp = post(config.earthmcApiBaseUrl + "/players", body.toString());
             status = resp.status();
@@ -321,14 +309,6 @@ public final class EarthMcData {
 
     private synchronized void onFailure(int status) {
         long now = System.currentTimeMillis();
-        if (status == 401 || status == 403) {
-            backoffUntil = now + AUTH_BACKOFF_MS;
-            if (now - lastAuthWarningMs >= AUTH_WARNING_INTERVAL_MS) {
-                lastAuthWarningMs = now;
-                authRejected.set(true);
-            }
-            return;
-        }
         // 429, 5xx, timeouts, no connection: back off exponentially.
         backoffMs = backoffMs == 0L ? MIN_BACKOFF_MS : Math.min(backoffMs * 2, MAX_BACKOFF_MS);
         backoffUntil = now + backoffMs;
