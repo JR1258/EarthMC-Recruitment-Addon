@@ -103,6 +103,13 @@ public class RecruitmentConfig {
     /** Official EarthMC API base (used only to look up a joiner's registration date). */
     public String earthmcApiBaseUrl = "https://api.earthmc.net/v4";
 
+    /**
+     * Optional EarthMC API key (create one in-game with {@code /api key create}, then set it with
+     * {@code /recruit apikey <key>}). Sent with player lookups; EarthMC has announced keys may
+     * become required. Never shared anywhere except api.earthmc.net.
+     */
+    public String apiKey = "";
+
     // ── Persistence ───────────────────────────────────────────────────────────
     public static RecruitmentConfig load() {
         Path path = FabricLoader.getInstance().getConfigDir().resolve(FILE_NAME);
@@ -134,6 +141,7 @@ public class RecruitmentConfig {
     private void ensureDefaults() {
         enabled = true;
         if (excludedPlayers == null) excludedPlayers = new ArrayList<>();
+        if (apiKey == null) apiKey = "";
         if (followUpMessages == null) followUpMessages = new ArrayList<>();
         if (globalAdReminderMinutes < 5) globalAdReminderMinutes = 5;
         if (globalAdMessage == null || globalAdMessage.isBlank()) globalAdMessage = DEFAULT_GLOBAL_AD_MESSAGE;
