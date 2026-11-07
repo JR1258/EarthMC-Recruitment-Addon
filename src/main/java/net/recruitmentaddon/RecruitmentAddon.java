@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Watches the server player list and posts a clickable recruit message whenever a
@@ -84,6 +85,12 @@ public class RecruitmentAddon implements ClientModInitializer {
         if (++tickCounter % POLL_INTERVAL_TICKS != 0) return;
         try {
             if (!isActiveOnEarthMc(client)) return;
+            data.tick();
+            if (data.consumeAuthRejected()) {
+                JoinAlerter.postNotice(config.apiKey == null || config.apiKey.isBlank()
+                        ? "The EarthMC API now needs a key, so alerts are paused. Run /api key create, then /recruit apikey <key>."
+                        : "The EarthMC API rejected your API key. Create a new one with /api key create, then /recruit apikey <key>.");
+            }
             joinAlerter.update(data, config);
             globalAdReminder.update(config);
             if (client.player != null) {
@@ -101,6 +108,7 @@ public class RecruitmentAddon implements ClientModInitializer {
                     if (info.getProfile() == null) continue;
                     String n = info.getProfile().name();
                     if (n == null || n.isBlank()) continue;
+                    data.rememberUuid(n, info.getProfile().id());
                     if (self != null && self.equalsIgnoreCase(n)) continue;
                     if (isExcluded(n)) continue;
                     online.put(n.toLowerCase(Locale.ROOT), n);
@@ -113,13 +121,14 @@ public class RecruitmentAddon implements ClientModInitializer {
         }
     }
 
-    public static void onPlayerListAddPacket(String name) {
+    public static void onPlayerListAddPacket(String name, UUID id) {
         try {
             MinecraftClient client = MinecraftClient.getInstance();
             if (joinAlerter == null || data == null || config == null) return;
             if (!isActiveOnEarthMcServer(client)) return;
             String self = client.player != null ? client.player.getGameProfile().name() : null;
             if (self != null && self.equalsIgnoreCase(name)) return;
+            data.rememberUuid(name, id);
             joinAlerter.onPlayerAdded(name, data, config);
         } catch (Exception e) {
             LOGGER.debug("[Recruitment] player-list add failed: {}", e.getMessage());

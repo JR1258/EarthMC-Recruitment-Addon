@@ -32,7 +32,7 @@ public abstract class ClientPlayNetworkHandlerMixin {
         for (PlayerListS2CPacket.Entry entry : packet.getEntries()) {
             if (entry.profile() == null || entry.profile().name() == null) continue;
             if (playerListEntries.containsKey(entry.profileId())) continue;
-            RecruitmentAddon.onPlayerListAddPacket(entry.profile().name());
+            RecruitmentAddon.onPlayerListAddPacket(entry.profile().name(), entry.profileId());
         }
     }
 
